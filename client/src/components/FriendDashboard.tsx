@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Friend, ApplicationStats, JobApplication } from '@/types';
+import { useState, useEffect } from 'react';
+import { Friend, ApplicationStats, JobApplication, ChartData } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StatsCards from '@/components/StatsCards';
@@ -17,10 +17,16 @@ interface FriendDashboardProps {
 
 export default function FriendDashboard({ friend, stats, loading, onClose }: FriendDashboardProps) {
   const [timeRange, setTimeRange] = useState(14);
+  const [applicationChartData, setApplicationChartData] = useState<ChartData | null>(null);
+  const [streakChartData, setStreakChartData] = useState<ChartData | null>(null);
   
-  // Generate chart data from friend stats if available
-  const applicationChartData = stats?.applicationChartData || null;
-  const streakChartData = stats?.streakChartData || null;
+  // Update local chart data whenever stats change
+  useEffect(() => {
+    if (stats) {
+      setApplicationChartData(stats.applicationChartData || null);
+      setStreakChartData(stats.streakChartData || null);
+    }
+  }, [stats]);
   
   // Get recent applications (or empty array if not available)
   const recentApplications: JobApplication[] = stats?.appliedJobs || [];
@@ -63,7 +69,67 @@ export default function FriendDashboard({ friend, stats, loading, onClose }: Fri
         streakData={streakChartData}
         title="Application Activity"
         loading={loading}
-        onTimeRangeChange={(days) => setTimeRange(days)}
+        onTimeRangeChange={(days) => {
+          setTimeRange(days);
+          // We need to update the chart data for the new time range
+          if (stats && stats.appliedJobs) {
+            // Create a copy to avoid directly modifying props
+            const updatedStats = { ...stats };
+            
+            // Generate chart data for the new time range using our friend's job data
+            if (typeof window !== "undefined") {
+              // Get access to Chart.js dynamically
+              import("chart.js").then(({ Chart }) => {
+                // Generate application chart data
+                const dates = [];
+                const labels = [];
+                const today = new Date();
+                const counts = Array(days).fill(0);
+                
+                // Generate dates for the past N days
+                for (let i = days - 1; i >= 0; i--) {
+                  const date = new Date();
+                  date.setDate(today.getDate() - i);
+                  const dateString = date.toISOString().split('T')[0];
+                  dates.push(dateString);
+                  
+                  // Format date for display (e.g., "Mon 12")
+                  const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric' };
+                  labels.push(date.toLocaleDateString('en-US', options));
+                }
+                
+                // Count applications per day
+                for (const job of stats.appliedJobs) {
+                  if (job.date) {
+                    const index = dates.indexOf(job.date);
+                    if (index !== -1) {
+                      counts[index]++;
+                    }
+                  }
+                }
+                
+                // Create application chart data
+                const applicationData = {
+                  labels,
+                  datasets: [
+                    {
+                      label: 'Applications',
+                      data: counts,
+                      backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                      borderColor: 'rgb(99, 102, 241)',
+                      borderWidth: 1,
+                      borderRadius: 4,
+                      barThickness: 16
+                    }
+                  ]
+                };
+                
+                // Set the chart data for the component
+                setApplicationChartData(applicationData);
+              });
+            }
+          }
+        }}
       />
       
       {/* Tabbed Content Section */}

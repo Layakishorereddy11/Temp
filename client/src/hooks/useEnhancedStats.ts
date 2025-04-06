@@ -62,11 +62,18 @@ export default function useEnhancedStats(userId: string | null, initialDays = 30
       const userData = userDoc.data();
       const userStats = userData.stats || {};
       
-      // Set basic stats
-      setStats(userStats);
-      
-      // Process applications for charts
+      // Get applications and ensure they're properly initialized
       const appliedJobs = userStats.appliedJobs || [];
+      
+      // Update stats with correct total applications count from database
+      // Create a copy of userStats object with correct totalApplications count
+      const updatedStats = {
+        ...userStats,
+        totalApplications: appliedJobs.length
+      };
+      
+      // Set the stats with the correct values
+      setStats(updatedStats);
       
       // Generate all chart data
       generateApplicationChartData(appliedJobs, days);
