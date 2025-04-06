@@ -32,6 +32,10 @@ export interface ApplicationStats {
   responseRate: number;
   lastUpdate: string;
   appliedJobs: JobApplication[];
+  // Chart data for visualizations
+  applicationChartData?: ChartData;
+  streakChartData?: ChartData;
+  allTimeChartData?: ChartData;
 }
 
 // Friend interface
@@ -41,6 +45,7 @@ export interface Friend {
   photoURL: string | null;
   totalApplications: number;
   streak: number;
+  email?: string;
   status?: 'online' | 'offline';
   lastActive?: string;
   isOnline?: boolean;

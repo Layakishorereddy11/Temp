@@ -1,6 +1,97 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Friend, ApplicationStats } from '@/types';
+import { Friend, ApplicationStats, ChartData, JobApplication } from '@/types';
 import { getFriends, getUserStats } from '@/lib/firebase';
+import { format, subDays, parseISO } from 'date-fns';
+
+// Helper function to generate chart data from stats for friends
+function generateChartDataFromStats(stats: ApplicationStats): { 
+  applicationChartData: ChartData; 
+  streakChartData: ChartData;
+} {
+  // Default to 14 days of data
+  const days = 14;
+  const today = new Date();
+  
+  // Generate labels for the last N days (most recent first)
+  const labels = Array.from({ length: days }, (_, i) => {
+    return format(subDays(today, days - 1 - i), 'MMM d');
+  });
+  
+  // Generate application chart data
+  const applications = Array(days).fill(0);
+  
+  // Process job applications to populate the data array
+  if (stats.appliedJobs && stats.appliedJobs.length > 0) {
+    for (const job of stats.appliedJobs) {
+      try {
+        // Get the date from the job application
+        const jobDate = job.date ? parseISO(job.date) : new Date();
+        
+        // Calculate days difference from today
+        const daysDiff = Math.floor((today.getTime() - jobDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // If the application is within our date range, count it
+        if (daysDiff >= 0 && daysDiff < days) {
+          applications[days - 1 - daysDiff]++;
+        }
+      } catch (err) {
+        console.error('Error processing job date:', err);
+      }
+    }
+  }
+  
+  // Generate streak chart data
+  const streak = Array(days).fill(0);
+  let currentStreak = stats.streak || 0;
+  
+  // Work backwards from today to show streak progression
+  for (let i = days - 1; i >= 0; i--) {
+    if (i < days - 1) {
+      // Decrease streak by 1 for each day going back, but don't go below 0
+      if (applications[i + 1] > 0) {
+        streak[i] = Math.max(0, streak[i + 1] - 1);
+      } else {
+        streak[i] = Math.max(0, streak[i + 1]);
+      }
+    } else {
+      // Today's streak
+      streak[i] = currentStreak;
+    }
+  }
+  
+  // Create chart data objects
+  const applicationChartData: ChartData = {
+    labels,
+    datasets: [
+      {
+        label: 'Applications',
+        data: applications,
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2,
+        borderRadius: 4,
+        barThickness: 12
+      }
+    ]
+  };
+  
+  const streakChartData: ChartData = {
+    labels,
+    datasets: [
+      {
+        label: 'Streak',
+        data: streak,
+        backgroundColor: 'rgba(249, 115, 22, 0.2)',
+        borderColor: 'rgba(249, 115, 22, 1)',
+        borderWidth: 2,
+        tension: 0.4,
+        fill: true
+      }
+    ]
+  };
+  
+  return { applicationChartData, streakChartData };
+}
 
 interface UseFriendsReturn {
   friends: Friend[];
@@ -31,10 +122,11 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
       
       const friendsData = await getFriends(userId);
       
-      // Add online status for UI (this would be real data in production)
+      // Process friend data to ensure all required properties are present
       const friendsWithStatus = friendsData.map((friend: Friend) => ({
         ...friend,
-        isOnline: Math.random() > 0.5 // Simulate online status for demo
+        isOnline: friend.isOnline ?? friend.status === 'online',
+        email: friend.email || `${friend.displayName?.toLowerCase().replace(/\s/g, '.')}@example.com`
       }));
       
       setFriends(friendsWithStatus);
@@ -75,6 +167,15 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
         } else {
           // Otherwise, fetch stats
           const stats = await getUserStats(friendId);
+          
+          // If chart data doesn't exist, create it from the stats
+          if (!stats.applicationChartData || !stats.streakChartData) {
+            // Get data for charts from the application data if available
+            const chartData = generateChartDataFromStats(stats);
+            stats.applicationChartData = chartData.applicationChartData;
+            stats.streakChartData = chartData.streakChartData;
+          }
+          
           setSelectedFriendStats(stats);
           
           // Update the friend in the friends list with the new stats

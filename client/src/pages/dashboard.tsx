@@ -10,7 +10,7 @@ import StatsCards from '@/components/StatsCards';
 import EnhancedChartComponent from '@/components/EnhancedChartComponent';
 import RecentApplications from '@/components/RecentApplications';
 import LeaderboardTable from '@/components/LeaderboardTable';
-import FriendView from '@/components/FriendView';
+import FriendDashboard from '@/components/FriendDashboard';
 import { PieChart, Share2, Trophy } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -93,8 +93,8 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="flex-1 p-6 pb-16 md:pb-6 overflow-y-auto">
         {selectedFriend ? (
-          // Friend Details View
-          <FriendView 
+          // Friend Dashboard View
+          <FriendDashboard 
             friend={selectedFriend}
             stats={selectedFriendStats}
             onClose={clearSelectedFriend}
@@ -186,151 +186,78 @@ export default function DashboardPage() {
               
               {/* Targets Tab */}
               <TabsContent value="targets" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>1000 Applications Challenge</CardTitle>
-                      <CardDescription>
-                        Track your progress toward 1000 job applications
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {loading ? (
-                        <div className="h-[200px] flex items-center justify-center">
-                          <div className="animate-pulse h-8 w-8 rounded-full bg-muted-foreground/10"></div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center space-y-4">
-                          <div className="h-[200px] w-[200px] relative flex items-center justify-center">
-                            <svg className="h-full w-full" viewBox="0 0 100 100">
-                              {/* Background circle */}
-                              <circle 
-                                cx="50" 
-                                cy="50" 
-                                r="40" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                className="text-gray-100 dark:text-gray-800" 
-                                strokeWidth="10" 
-                              />
-                              
-                              {/* Progress arc - calculate stroke dasharray and dashoffset */}
-                              <circle 
-                                cx="50" 
-                                cy="50" 
-                                r="40" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                className="text-primary-500" 
-                                strokeWidth="10" 
-                                strokeDasharray="251.2" 
-                                strokeDashoffset={251.2 * (1 - (stats?.totalApplications || 0) / 1000)} 
-                                strokeLinecap="round"
-                                transform="rotate(-90, 50, 50)" 
-                              />
-                            </svg>
-                            <div className="absolute flex flex-col items-center justify-center">
-                              <span className="text-3xl font-bold">
-                                {stats?.totalApplications || 0}
-                              </span>
-                              <span className="text-xs text-muted-foreground">of 1000 applications</span>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 w-full text-center">
-                            <div>
-                              <p className="text-sm font-medium">Progress</p>
-                              <p className="text-2xl font-bold">
-                                {Math.round(((stats?.totalApplications || 0) / 1000) * 100)}%
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Remaining</p>
-                              <p className="text-2xl font-bold">
-                                {1000 - (stats?.totalApplications || 0)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Daily Goal</p>
-                              <p className="text-2xl font-bold text-primary-500">5</p>
-                            </div>
+                <Card className="mx-auto max-w-md">
+                  <CardHeader>
+                    <CardTitle>1000 Applications Challenge</CardTitle>
+                    <CardDescription>
+                      Track your progress toward 1000 job applications
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="h-[200px] flex items-center justify-center">
+                        <div className="animate-pulse h-8 w-8 rounded-full bg-muted-foreground/10"></div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center space-y-4">
+                        <div className="h-[200px] w-[200px] relative flex items-center justify-center">
+                          <svg className="h-full w-full" viewBox="0 0 100 100">
+                            {/* Background circle */}
+                            <circle 
+                              cx="50" 
+                              cy="50" 
+                              r="40" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              className="text-gray-100 dark:text-gray-800" 
+                              strokeWidth="10" 
+                            />
+                            
+                            {/* Progress arc - calculate stroke dasharray and dashoffset */}
+                            <circle 
+                              cx="50" 
+                              cy="50" 
+                              r="40" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              className="text-primary-500" 
+                              strokeWidth="10" 
+                              strokeDasharray="251.2" 
+                              strokeDashoffset={251.2 * (1 - (stats?.totalApplications || 0) / 1000)} 
+                              strokeLinecap="round"
+                              transform="rotate(-90, 50, 50)" 
+                            />
+                          </svg>
+                          <div className="absolute flex flex-col items-center justify-center">
+                            <span className="text-3xl font-bold">
+                              {stats?.totalApplications || 0}
+                            </span>
+                            <span className="text-xs text-muted-foreground">of 1000 applications</span>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Response Rate</CardTitle>
-                      <CardDescription>
-                        Your application response statistics
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {loading ? (
-                        <div className="h-[200px] flex items-center justify-center">
-                          <div className="animate-pulse h-8 w-8 rounded-full bg-muted-foreground/10"></div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center space-y-4">
-                          <div className="h-[200px] w-[200px] relative flex items-center justify-center">
-                            <svg className="h-full w-full" viewBox="0 0 100 100">
-                              {/* Background circle */}
-                              <circle 
-                                cx="50" 
-                                cy="50" 
-                                r="40" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                className="text-gray-100 dark:text-gray-800" 
-                                strokeWidth="10" 
-                              />
-                              
-                              {/* Response rate arc - calculate stroke dasharray and dashoffset */}
-                              <circle 
-                                cx="50" 
-                                cy="50" 
-                                r="40" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                className="text-indigo-500" 
-                                strokeWidth="10" 
-                                strokeDasharray="251.2" 
-                                strokeDashoffset={251.2 * (1 - (responseRateData?.responded || 0) / Math.max(1, responseRateData?.total || 1))} 
-                                strokeLinecap="round"
-                                transform="rotate(-90, 50, 50)" 
-                              />
-                            </svg>
-                            <div className="absolute flex flex-col items-center justify-center">
-                              <span className="text-3xl font-bold">
-                                {responseRateData?.total 
-                                  ? Math.round((responseRateData.responded / responseRateData.total) * 100) 
-                                  : 0}%
-                              </span>
-                              <span className="text-xs text-muted-foreground">Response Rate</span>
-                            </div>
+                        
+                        <div className="grid grid-cols-3 w-full text-center">
+                          <div>
+                            <p className="text-sm font-medium">Progress</p>
+                            <p className="text-2xl font-bold">
+                              {Math.round(((stats?.totalApplications || 0) / 1000) * 100)}%
+                            </p>
                           </div>
-                          
-                          <div className="grid grid-cols-3 w-full text-center">
-                            <div>
-                              <p className="text-sm font-medium">Total</p>
-                              <p className="text-2xl font-bold">{responseRateData?.total || 0}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Responded</p>
-                              <p className="text-2xl font-bold text-green-500">{responseRateData?.responded || 0}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Pending</p>
-                              <p className="text-2xl font-bold text-amber-500">{responseRateData?.pending || 0}</p>
-                            </div>
+                          <div>
+                            <p className="text-sm font-medium">Remaining</p>
+                            <p className="text-2xl font-bold">
+                              {1000 - (stats?.totalApplications || 0)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Current Streak</p>
+                            <p className="text-2xl font-bold text-primary-500">{stats?.streak || 0} days</p>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>
