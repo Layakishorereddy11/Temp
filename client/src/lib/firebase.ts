@@ -7,8 +7,10 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
-  onAuthStateChanged,
-  User
+  User,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -17,58 +19,59 @@ import {
   setDoc, 
   getDoc, 
   updateDoc, 
-  query, 
-  where, 
+  addDoc, 
   getDocs, 
-  arrayUnion, 
-  arrayRemove, 
+  query, 
+  where,
   serverTimestamp,
+  arrayUnion,
+  arrayRemove,
   Timestamp,
-  orderBy,
-  limit 
+  limit,
+  orderBy
 } from "firebase/firestore";
 
-// Initialize Firebase with environment variables or fallback values
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+export const auth = getAuth(app);
+export const db = getFirestore(app);
 
-// Authentication functions
+// Authentication helpers
 export const loginWithEmail = async (email: string, password: string) => {
   try {
-    return await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
   } catch (error) {
-    console.error("Error signing in with email", error);
     throw error;
   }
 };
 
 export const signupWithEmail = async (name: string, email: string, password: string) => {
   try {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(result.user, { displayName: name });
-    return result;
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: name });
+    await createUserDocument(userCredential.user);
+    return userCredential.user;
   } catch (error) {
-    console.error("Error signing up with email", error);
     throw error;
   }
 };
 
 export const signInWithGoogle = async () => {
   try {
-    return await signInWithPopup(auth, googleProvider);
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    await createUserDocument(result.user);
+    return result.user;
   } catch (error) {
-    console.error("Error signing in with Google", error);
     throw error;
   }
 };
@@ -77,314 +80,417 @@ export const logoutUser = async () => {
   try {
     await signOut(auth);
   } catch (error) {
-    console.error("Error signing out", error);
     throw error;
   }
 };
 
-// Firestore data functions
+// Firestore helpers
 export const createUserDocument = async (user: User) => {
+  if (!user?.uid) return;
+
   try {
-    // Create default user stats
-    const defaultStats = {
-      todayCount: 0,
-      streak: 0,
-      lastUpdated: new Date().toISOString().split('T')[0],
-      appliedJobs: []
-    };
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
 
-    // Create user document in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      displayName: user.displayName || '',
-      email: user.email || '',
-      photoURL: user.photoURL || '',
-      createdAt: serverTimestamp(),
-      stats: defaultStats,
-      friends: []
-    });
-
-    return defaultStats;
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        uid: user.uid,
+        displayName: user.displayName || '',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        createdAt: serverTimestamp(),
+        stats: {
+          todayCount: 0,
+          streak: 0,
+          lastUpdated: new Date().toISOString().split('T')[0],
+          appliedJobs: []
+        },
+        friends: []
+      });
+    }
   } catch (error) {
-    console.error("Error creating user document", error);
-    throw error;
+    console.error("Error creating user document:", error);
   }
 };
 
+// Application stats helpers
 export const getUserStats = async (userId: string) => {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
-      return userDoc.data().stats;
+      return userDoc.data().stats || null;
     }
     return null;
   } catch (error) {
-    console.error("Error getting user stats", error);
+    console.error("Error getting user stats:", error);
     throw error;
   }
 };
 
 export const updateUserStats = async (userId: string, stats: any) => {
   try {
-    await updateDoc(doc(db, "users", userId), {
-      stats: stats
-    });
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, { stats });
   } catch (error) {
-    console.error("Error updating user stats", error);
+    console.error("Error updating user stats:", error);
     throw error;
   }
 };
 
+// Application tracking
 export const trackApplication = async (userId: string, application: any) => {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
       const userData = userDoc.data();
       const stats = userData.stats || {};
-      
-      // Update today's count
-      const today = new Date().toISOString().split('T')[0];
-      if (stats.lastUpdated !== today) {
-        stats.todayCount = 1;
-        stats.lastUpdated = today;
-      } else {
-        stats.todayCount = (stats.todayCount || 0) + 1;
-      }
-      
-      // Update streak
-      // Logic: If user applied to at least one job today, maintain streak
-      // If last update was yesterday, increment streak
-      // If last update was older, reset streak to 1
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-      
-      if (stats.lastUpdated === yesterdayStr) {
-        stats.streak = (stats.streak || 0) + 1;
-      } else if (stats.lastUpdated < yesterdayStr) {
-        stats.streak = 1;
-      }
-      
-      // Add to applied jobs array
       const appliedJobs = stats.appliedJobs || [];
-      // Reset lastTracked flag for all jobs
-      appliedJobs.forEach((job: any) => {
-        job.lastTracked = false;
-      });
+      const today = new Date().toISOString().split('T')[0];
       
-      // Add new job with lastTracked flag
-      appliedJobs.push({
+      // Reset any previous lastTracked flags
+      const updatedJobs = appliedJobs.map((job: any) => ({
+        ...job,
+        lastTracked: false
+      }));
+      
+      // Add the new application
+      const newApplication = {
         ...application,
         timestamp: Timestamp.now(),
-        lastTracked: true
+        lastTracked: true,
+        date: today
+      };
+      
+      // Check if it's a new day for streak calculation
+      const lastUpdated = stats.lastUpdated || '';
+      let streak = stats.streak || 0;
+      let todayCount = 0;
+      
+      if (lastUpdated !== today) {
+        const lastDate = new Date(lastUpdated);
+        const currentDate = new Date(today);
+        
+        // Check if yesterday - for streak continuation
+        const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+          // Consecutive day, increase streak
+          streak++;
+        } else if (diffDays > 1) {
+          // Streak broken, reset
+          streak = 1;
+        }
+        
+        todayCount = 1; // First application of the day
+      } else {
+        // Same day, increment today's count
+        todayCount = (stats.todayCount || 0) + 1;
+      }
+      
+      await updateDoc(userRef, {
+        stats: {
+          ...stats,
+          appliedJobs: [newApplication, ...updatedJobs],
+          lastUpdated: today,
+          todayCount,
+          streak
+        }
       });
       
-      stats.appliedJobs = appliedJobs;
-      
-      // Update user document
-      await updateDoc(doc(db, "users", userId), {
-        stats: stats
-      });
-      
-      return stats;
+      return { 
+        success: true,
+        stats: {
+          appliedJobs: [newApplication, ...updatedJobs],
+          lastUpdated: today,
+          todayCount,
+          streak
+        }
+      };
     }
-    return null;
+    
+    throw new Error("User document not found");
   } catch (error) {
-    console.error("Error tracking application", error);
+    console.error("Error tracking application:", error);
     throw error;
   }
 };
 
+// Friends management
 export const getFriends = async (userId: string) => {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
       const userData = userDoc.data();
       const friendIds = userData.friends || [];
       
       if (friendIds.length === 0) return [];
       
-      const friendsData = [];
+      const friends = [];
       for (const friendId of friendIds) {
-        const friendDoc = await getDoc(doc(db, "users", friendId));
+        const friendRef = doc(db, "users", friendId);
+        const friendDoc = await getDoc(friendRef);
+        
         if (friendDoc.exists()) {
-          friendsData.push({
+          const friendData = friendDoc.data();
+          friends.push({
             id: friendId,
-            ...friendDoc.data()
+            displayName: friendData.displayName,
+            email: friendData.email,
+            photoURL: friendData.photoURL,
+            stats: friendData.stats
           });
         }
       }
       
-      return friendsData;
+      return friends;
     }
+    
     return [];
   } catch (error) {
-    console.error("Error getting friends", error);
+    console.error("Error getting friends:", error);
     throw error;
   }
 };
 
-export const getLeaderboard = async (userId: string) => {
+export const addFriend = async (userId: string, friendEmail: string) => {
   try {
-    // Get user's friends first
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) return [];
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", friendEmail));
+    const querySnapshot = await getDocs(q);
     
-    const userData = userDoc.data();
-    const friendIds = [...(userData.friends || []), userId];
-    
-    // Get all users data for leaderboard
-    const leaderboardData = [];
-    for (const id of friendIds) {
-      const userDoc = await getDoc(doc(db, "users", id));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        leaderboardData.push({
-          id: id,
-          displayName: data.displayName,
-          photoURL: data.photoURL,
-          isCurrentUser: id === userId,
-          streak: data.stats?.streak || 0,
-          todayCount: data.stats?.todayCount || 0,
-          totalApplications: data.stats?.appliedJobs?.length || 0
-        });
-      }
+    if (querySnapshot.empty) {
+      throw new Error("User not found with that email");
     }
     
-    // Sort by streak (primary) and total applications (secondary)
-    return leaderboardData.sort((a, b) => {
-      if (b.streak !== a.streak) return b.streak - a.streak;
-      return b.totalApplications - a.totalApplications;
-    });
-  } catch (error) {
-    console.error("Error getting leaderboard", error);
-    throw error;
-  }
-};
-
-export const getApplicationsChartData = async (userId: string, days = 7) => {
-  try {
-    const userDoc = await getDoc(doc(db, "users", userId));
+    const friendDoc = querySnapshot.docs[0];
+    const friendId = friendDoc.id;
+    
+    // Don't add yourself as a friend
+    if (friendId === userId) {
+      throw new Error("You can't add yourself as a friend");
+    }
+    
+    // Check if already a friend
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
       const userData = userDoc.data();
-      const appliedJobs = userData.stats?.appliedJobs || [];
+      const friends = userData.friends || [];
       
-      // Generate dates for the last 'days' days
-      const dates = [];
-      const counts = [];
-      
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        dates.push(dateStr);
-        
-        // Count jobs applied on this date
-        const count = appliedJobs.filter((job: any) => {
-          const jobDate = job.date || (job.timestamp?.toDate().toISOString().split('T')[0]);
-          return jobDate === dateStr;
-        }).length;
-        
-        counts.push(count);
+      if (friends.includes(friendId)) {
+        throw new Error("This user is already in your friends list");
       }
       
-      // Format dates for display
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const formattedDates = dates.map(date => {
-        const day = new Date(date).getDay();
-        return dayNames[day === 0 ? 6 : day - 1]; // Adjust for Sunday
+      // Add to current user's friends
+      await updateDoc(userRef, {
+        friends: arrayUnion(friendId)
+      });
+      
+      // Add current user to friend's friends list (reciprocal)
+      const friendRef = doc(db, "users", friendId);
+      await updateDoc(friendRef, {
+        friends: arrayUnion(userId)
       });
       
       return {
-        labels: formattedDates,
-        datasets: [{
-          label: 'Applications Submitted',
-          data: counts,
-          backgroundColor: 'rgba(0, 112, 243, 0.2)',
-          borderColor: 'rgba(0, 112, 243, 1)',
-          borderWidth: 2,
-          borderRadius: 4,
-          barThickness: 16,
-        }]
+        id: friendId,
+        displayName: friendDoc.data().displayName,
+        email: friendDoc.data().email,
+        photoURL: friendDoc.data().photoURL,
+        stats: friendDoc.data().stats
       };
     }
     
-    return {
-      labels: [],
-      datasets: [{
-        label: 'Applications Submitted',
-        data: [],
-        backgroundColor: 'rgba(0, 112, 243, 0.2)',
-        borderColor: 'rgba(0, 112, 243, 1)',
-        borderWidth: 2,
-        borderRadius: 4,
-        barThickness: 16,
-      }]
-    };
+    throw new Error("User document not found");
   } catch (error) {
-    console.error("Error getting applications chart data", error);
+    console.error("Error adding friend:", error);
     throw error;
   }
 };
 
-export const getRecentApplications = async (userId: string, limit = 5) => {
+export const removeFriend = async (userId: string, friendId: string) => {
   try {
-    const userDoc = await getDoc(doc(db, "users", userId));
+    // Remove from current user's friends
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+      friends: arrayRemove(friendId)
+    });
+    
+    // Remove current user from friend's friends (reciprocal)
+    const friendRef = doc(db, "users", friendId);
+    await updateDoc(friendRef, {
+      friends: arrayRemove(userId)
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error removing friend:", error);
+    throw error;
+  }
+};
+
+// Leaderboard
+export const getLeaderboard = async (userId: string) => {
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const friendIds = userData.friends || [];
+      
+      // Include current user in leaderboard
+      const leaderboard = [
+        {
+          id: userId,
+          displayName: userData.displayName,
+          photoURL: userData.photoURL,
+          isCurrentUser: true,
+          streak: userData.stats?.streak || 0,
+          todayCount: userData.stats?.todayCount || 0,
+          totalApplications: userData.stats?.appliedJobs?.length || 0
+        }
+      ];
+      
+      // Add friends to leaderboard
+      for (const friendId of friendIds) {
+        const friendRef = doc(db, "users", friendId);
+        const friendDoc = await getDoc(friendRef);
+        
+        if (friendDoc.exists()) {
+          const friendData = friendDoc.data();
+          leaderboard.push({
+            id: friendId,
+            displayName: friendData.displayName,
+            photoURL: friendData.photoURL,
+            isCurrentUser: false,
+            streak: friendData.stats?.streak || 0,
+            todayCount: friendData.stats?.todayCount || 0,
+            totalApplications: friendData.stats?.appliedJobs?.length || 0
+          });
+        }
+      }
+      
+      // Sort by streak, then by today's applications
+      return leaderboard.sort((a, b) => {
+        if (b.streak !== a.streak) {
+          return b.streak - a.streak;
+        }
+        return b.todayCount - a.todayCount;
+      });
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error getting leaderboard:", error);
+    throw error;
+  }
+};
+
+// Chart data
+export const getApplicationsChartData = async (userId: string, days = 7) => {
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
       const userData = userDoc.data();
       const appliedJobs = userData.stats?.appliedJobs || [];
       
-      // Sort by timestamp (descending)
+      // Generate dates for the past N days
+      const dates = [];
+      const labels = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+        dates.push(dateString);
+        
+        // Format date for display (e.g., "Mon 12")
+        const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric' };
+        labels.push(date.toLocaleDateString('en-US', options));
+      }
+      
+      // Count applications per day
+      const counts = dates.map(date => {
+        return appliedJobs.filter((job: any) => job.date === date).length;
+      });
+      
+      return {
+        labels,
+        datasets: [
+          {
+            label: 'Applications',
+            data: counts,
+            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+            borderColor: 'rgb(99, 102, 241)',
+            borderWidth: 1,
+            borderRadius: 4,
+            barThickness: 16
+          }
+        ]
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error getting chart data:", error);
+    throw error;
+  }
+};
+
+// Recent applications
+export const getRecentApplications = async (userId: string, limit = 5) => {
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const appliedJobs = userData.stats?.appliedJobs || [];
+      
+      // Sort by timestamp (newest first) and limit
       return appliedJobs
-        .sort((a: any, b: any) => {
-          const aTime = a.timestamp?.toMillis() || 0;
-          const bTime = b.timestamp?.toMillis() || 0;
-          return bTime - aTime;
-        })
+        .sort((a: any, b: any) => b.timestamp.toMillis() - a.timestamp.toMillis())
         .slice(0, limit);
     }
     
     return [];
   } catch (error) {
-    console.error("Error getting recent applications", error);
+    console.error("Error getting recent applications:", error);
     throw error;
   }
 };
 
-// Helper to format time
+// Helper to format timestamp
 export const formatApplicationTime = (timestamp: Timestamp) => {
-  if (!timestamp) return 'Unknown';
-  
+  const now = new Date();
   const date = timestamp.toDate();
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
   
-  const isToday = date.getDate() === today.getDate() && 
-                  date.getMonth() === today.getMonth() && 
-                  date.getFullYear() === today.getFullYear();
-  
-  const isYesterday = date.getDate() === yesterday.getDate() && 
-                      date.getMonth() === yesterday.getMonth() && 
-                      date.getFullYear() === yesterday.getFullYear();
-  
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const formattedHours = hours % 12 || 12; // Convert to 12-hour format
-  const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-  const timeStr = `${formattedHours}:${formattedMinutes} ${ampm}`;
-  
-  if (isToday) {
-    return `Today, ${timeStr}`;
-  } else if (isYesterday) {
-    return `Yesterday, ${timeStr}`;
+  if (diffMinutes < 1) {
+    return 'Just now';
+  } else if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  } else if (diffMinutes < 1440) {
+    const hours = Math.floor(diffMinutes / 60);
+    return `${hours}h ago`;
   } else {
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    }) + `, ${timeStr}`;
+    const days = Math.floor(diffMinutes / 1440);
+    if (days === 1) {
+      return 'Yesterday';
+    } else if (days < 7) {
+      return `${days}d ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
   }
 };
-
-export { auth, db, onAuthStateChanged };

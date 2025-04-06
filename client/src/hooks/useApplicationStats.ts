@@ -1,105 +1,103 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   getUserStats, 
-  updateUserStats, 
-  trackApplication, 
-  getApplicationsChartData,
-  getRecentApplications,
-  getLeaderboard
+  getApplicationsChartData, 
+  getRecentApplications, 
+  getLeaderboard,
+  trackApplication
 } from '@/lib/firebase';
 import { ApplicationStats, ChartData, JobApplication, LeaderboardEntry } from '@/types';
 
-export default function useApplicationStats(userId: string | null) {
+interface UseApplicationStatsReturn {
+  stats: ApplicationStats | null;
+  chartData: ChartData | null;
+  recentApplications: JobApplication[];
+  leaderboard: LeaderboardEntry[];
+  loading: boolean;
+  error: string | null;
+  lastUpdated: string | null;
+  addApplication: (application: Partial<JobApplication>) => Promise<void>;
+}
+
+export default function useApplicationStats(userId: string | null): UseApplicationStatsReturn {
   const [stats, setStats] = useState<ApplicationStats | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [recentApplications, setRecentApplications] = useState<JobApplication[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  // Fetch user stats
-  const fetchStats = async () => {
-    if (!userId) return;
-    
-    setLoading(true);
-    setError(null);
-    
+  // Function to load all application stats
+  const loadStats = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const userStats = await getUserStats(userId);
-      setStats(userStats);
+      setLoading(true);
       
-      // Get chart data for the last 7 days
-      const chartData = await getApplicationsChartData(userId, 7);
+      // Load user stats
+      const stats = await getUserStats(userId);
+      setStats(stats);
+      
+      if (stats?.lastUpdated) {
+        // Format lastUpdated to a readable format
+        const date = new Date(stats.lastUpdated);
+        const options: Intl.DateTimeFormatOptions = {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        };
+        setLastUpdated(date.toLocaleDateString('en-US', options));
+      }
+      
+      // Load chart data for applications over time
+      const chartData = await getApplicationsChartData(userId);
       setChartData(chartData);
       
-      // Get recent applications
-      const applications = await getRecentApplications(userId, 5);
-      setRecentApplications(applications);
+      // Load recent applications
+      const recentApps = await getRecentApplications(userId);
+      setRecentApplications(recentApps);
       
-      // Get leaderboard
+      // Load leaderboard data
       const leaderboardData = await getLeaderboard(userId);
       setLeaderboard(leaderboardData);
       
-      // Set last updated time
-      setLastUpdated(new Date().toLocaleString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }));
-      
-      setLoading(false);
+      setError(null);
     } catch (err) {
-      setError((err as Error).message);
-      setLoading(false);
-    }
-  };
-
-  // Track a new job application
-  const addApplication = async (application: Partial<JobApplication>) => {
-    if (!userId) return;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Create job application object
-      const newApplication = {
-        url: application.url || window.location.href,
-        title: application.title || document.title,
-        date: new Date().toISOString().split('T')[0],
-        ...application
-      };
-      
-      // Track the application
-      const updatedStats = await trackApplication(userId, newApplication);
-      setStats(updatedStats);
-      
-      // Refresh data
-      await fetchStats();
-      
-      setLoading(false);
-    } catch (err) {
-      setError((err as Error).message);
-      setLoading(false);
-    }
-  };
-
-  // Load data when userId changes
-  useEffect(() => {
-    if (userId) {
-      fetchStats();
-    } else {
-      setStats(null);
-      setChartData(null);
-      setRecentApplications([]);
-      setLeaderboard([]);
+      console.error('Error loading application stats:', err);
+      setError('Failed to load application stats');
+    } finally {
       setLoading(false);
     }
   }, [userId]);
 
-  // Refresh data function
-  const refreshData = () => fetchStats();
+  // Load stats on mount and when userId changes
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // Function to add a new application
+  const addApplication = async (application: Partial<JobApplication>): Promise<void> => {
+    if (!userId) return;
+    
+    try {
+      const result = await trackApplication(userId, application);
+      
+      if (result.success) {
+        // Update local state with the new stats
+        setStats(result.stats);
+        
+        // Reload all data to ensure consistency
+        loadStats();
+      }
+    } catch (err) {
+      console.error('Error adding application:', err);
+      throw err;
+    }
+  };
 
   return {
     stats,
@@ -109,7 +107,6 @@ export default function useApplicationStats(userId: string | null) {
     loading,
     error,
     lastUpdated,
-    addApplication,
-    refreshData
+    addApplication
   };
 }

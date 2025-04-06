@@ -11,6 +11,7 @@ import ChartComponent from '@/components/ChartComponent';
 import LeaderboardTable from '@/components/LeaderboardTable';
 import RecentApplications from '@/components/RecentApplications';
 import FriendView from '@/components/FriendView';
+import DemoDataButton from '@/components/DemoDataButton';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useFirebaseAuth();
@@ -190,6 +191,17 @@ export default function Dashboard() {
           </div>
           
           <div className="mt-5 flex lg:mt-0 lg:ml-4">
+            <span>
+              <DemoDataButton 
+                onSuccess={() => {
+                  // Refresh data after demo data is generated
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1000);
+                }}
+              />
+            </span>
+            
             <span className="hidden sm:block ml-3">
               <a 
                 href="#" 

@@ -7,13 +7,15 @@ interface ChartComponentProps {
   title: string;
   type?: 'line' | 'bar';
   height?: string;
+  loading?: boolean;
 }
 
 export default function ChartComponent({ 
   data, 
   title, 
   type = 'bar', 
-  height = '16rem' 
+  height = '16rem',
+  loading = false
 }: ChartComponentProps) {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -30,31 +32,30 @@ export default function ChartComponent({
     const ctx = chartRef.current.getContext('2d');
     if (!ctx) return;
 
-    chartInstance.current = new Chart(ctx, {
-      type,
-      data,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          }
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              drawBorder: false
-            }
-          },
-          x: {
-            grid: {
-              display: false
-            }
+        x: {
+          grid: {
+            display: false
           }
         }
       }
+    };
+
+    chartInstance.current = new Chart(ctx, {
+      type,
+      data,
+      options: chartOptions
     });
 
     return () => {
@@ -81,11 +82,16 @@ export default function ChartComponent({
         </div>
       </div>
       <div style={{ height }}>
-        {data ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="w-10 h-10 border-4 border-gray-200 border-t-primary-500 rounded-full animate-spin mb-3"></div>
+            <p className="text-gray-400">Loading chart data...</p>
+          </div>
+        ) : data ? (
           <canvas ref={chartRef}></canvas>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400">Loading chart data...</p>
+            <p className="text-gray-400">No data available</p>
           </div>
         )}
       </div>

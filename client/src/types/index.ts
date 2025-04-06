@@ -9,10 +9,10 @@ export interface User {
 }
 
 export interface ApplicationStats {
-  todayCount: number;
-  streak: number;
-  lastUpdated: string;
-  appliedJobs: JobApplication[];
+  todayCount?: number;
+  streak?: number;
+  lastUpdated?: string;
+  appliedJobs?: JobApplication[];
   totalResponses?: number;
   responseRate?: number;
 }
