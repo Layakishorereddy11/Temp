@@ -25,7 +25,7 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
   const userId = auth.currentUser?.uid || null;
   
   // Use the shared hooks instead of duplicating logic
-  const { friends, loading, error } = useFriends(userId);
+  const { friends, loading, error, refreshFriends } = useFriends(userId);
   
   const handleRemoveFriend = async (friendId: string) => {
     if (!userId) return;
@@ -36,6 +36,9 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
       if (selectedFriendId === friendId) {
         onSelectFriend('');
       }
+      
+      // Explicitly refresh the friends list
+      await refreshFriends();
       
       toast({
         title: "Friend removed",
@@ -230,8 +233,9 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
         userId={auth.currentUser?.uid || null} 
         open={addFriendOpen}
         onOpenChange={setAddFriendOpen}
-        onFriendAdded={() => {
-          // Since we're using useFriends hook, it will automatically refresh
+        onFriendAdded={async () => {
+          // Explicitly refresh the friends list
+          await refreshFriends();
           toast({
             title: "Friend added",
             description: "New friend has been added to your list",

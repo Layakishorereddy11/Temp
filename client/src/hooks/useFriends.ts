@@ -101,6 +101,7 @@ interface UseFriendsReturn {
   error: string | null;
   selectFriend: (friendId: string) => void;
   clearSelectedFriend: () => void;
+  refreshFriends: () => Promise<void>;
 }
 
 export default function useFriends(userId: string | null): UseFriendsReturn {
@@ -210,6 +211,7 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
     loading,
     error,
     selectFriend,
-    clearSelectedFriend
+    clearSelectedFriend,
+    refreshFriends: loadFriends
   };
 }
