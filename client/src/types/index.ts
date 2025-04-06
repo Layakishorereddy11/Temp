@@ -43,6 +43,7 @@ export interface Friend {
   streak: number;
   status?: 'online' | 'offline';
   lastActive?: string;
+  isOnline?: boolean;
   stats?: ApplicationStats;
 }
 

@@ -134,23 +134,23 @@ export default function EnhancedChartComponent({
           scales: {
             x: {
               grid: {
-                display: false,
-                // Remove drawBorder as it's not supported in this version
-                // of Chart.js
+                display: false
               },
               border: {
                 display: false
               },
               ticks: {
-                color: '#9ca3af'
+                color: '#9ca3af',
+                // Limit number of ticks to prevent overlap
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 7
               }
             },
             y: {
               beginAtZero: true,
               grid: {
-                color: 'rgba(243, 244, 246, 1)',
-                // Remove drawBorder as it's not supported in this version
-                // of Chart.js
+                color: 'rgba(243, 244, 246, 1)'
               },
               border: {
                 display: false
@@ -158,7 +158,9 @@ export default function EnhancedChartComponent({
               ticks: {
                 color: '#9ca3af',
                 precision: 0, // Only show integers
-                stepSize: 1
+                stepSize: 1,
+                // Add padding to prevent overlap with chart border
+                padding: 8
               }
             }
           }

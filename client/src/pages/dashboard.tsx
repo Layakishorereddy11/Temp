@@ -129,9 +129,9 @@ export default function DashboardPage() {
                   <Trophy className="h-4 w-4 mr-1" />
                   Leaderboard
                 </TabsTrigger>
-                <TabsTrigger value="insights" className="text-sm">
+                <TabsTrigger value="targets" className="text-sm">
                   <PieChart className="h-4 w-4 mr-1" />
-                  Insights
+                  Targets
                 </TabsTrigger>
               </TabsList>
               
@@ -184,9 +184,82 @@ export default function DashboardPage() {
                 </Card>
               </TabsContent>
               
-              {/* Insights Tab */}
-              <TabsContent value="insights" className="space-y-4">
+              {/* Targets Tab */}
+              <TabsContent value="targets" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>1000 Applications Challenge</CardTitle>
+                      <CardDescription>
+                        Track your progress toward 1000 job applications
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loading ? (
+                        <div className="h-[200px] flex items-center justify-center">
+                          <div className="animate-pulse h-8 w-8 rounded-full bg-muted-foreground/10"></div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center space-y-4">
+                          <div className="h-[200px] w-[200px] relative flex items-center justify-center">
+                            <svg className="h-full w-full" viewBox="0 0 100 100">
+                              {/* Background circle */}
+                              <circle 
+                                cx="50" 
+                                cy="50" 
+                                r="40" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                className="text-gray-100 dark:text-gray-800" 
+                                strokeWidth="10" 
+                              />
+                              
+                              {/* Progress arc - calculate stroke dasharray and dashoffset */}
+                              <circle 
+                                cx="50" 
+                                cy="50" 
+                                r="40" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                className="text-primary-500" 
+                                strokeWidth="10" 
+                                strokeDasharray="251.2" 
+                                strokeDashoffset={251.2 * (1 - (stats?.totalApplications || 0) / 1000)} 
+                                strokeLinecap="round"
+                                transform="rotate(-90, 50, 50)" 
+                              />
+                            </svg>
+                            <div className="absolute flex flex-col items-center justify-center">
+                              <span className="text-3xl font-bold">
+                                {stats?.totalApplications || 0}
+                              </span>
+                              <span className="text-xs text-muted-foreground">of 1000 applications</span>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 w-full text-center">
+                            <div>
+                              <p className="text-sm font-medium">Progress</p>
+                              <p className="text-2xl font-bold">
+                                {Math.round(((stats?.totalApplications || 0) / 1000) * 100)}%
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Remaining</p>
+                              <p className="text-2xl font-bold">
+                                {1000 - (stats?.totalApplications || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Daily Goal</p>
+                              <p className="text-2xl font-bold text-primary-500">5</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
                   <Card>
                     <CardHeader>
                       <CardTitle>Response Rate</CardTitle>
@@ -253,27 +326,6 @@ export default function DashboardPage() {
                               <p className="text-2xl font-bold text-amber-500">{responseRateData?.pending || 0}</p>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Application Status</CardTitle>
-                      <CardDescription>
-                        Distribution of your application statuses
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {loading ? (
-                        <div className="h-[200px] flex items-center justify-center">
-                          <div className="animate-pulse h-8 w-8 rounded-full bg-muted-foreground/10"></div>
-                        </div>
-                      ) : (
-                        // To be implemented: Status distribution chart
-                        <div className="h-[200px] flex items-center justify-center">
-                          <p className="text-sm text-muted-foreground">More insights coming soon!</p>
                         </div>
                       )}
                     </CardContent>

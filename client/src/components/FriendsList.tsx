@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Friend } from '@/types';
-import { getFriends, removeFriend } from '@/lib/firebase';
+import { removeFriend } from '@/lib/firebase';
 import { auth } from '@/lib/firebase';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -9,10 +9,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Plus, UserPlus, UserX } from 'lucide-react';
+import useFriends from '@/hooks/useFriends';
 
 interface FriendsListProps {
   onSelectFriend: (friendId: string) => void;
@@ -20,55 +20,18 @@ interface FriendsListProps {
 }
 
 export default function FriendsList({ onSelectFriend, selectedFriendId }: FriendsListProps) {
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [addFriendOpen, setAddFriendOpen] = useState<boolean>(false);
   const { toast } = useToast();
-
-  const loadFriends = async () => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-    
-    try {
-      setLoading(true);
-      const friendsData = await getFriends(userId);
-      
-      // Add online status for UI (this would be real data in production)
-      const friendsWithStatus = friendsData.map((friend: Friend) => ({
-        ...friend,
-        isOnline: Math.random() > 0.5,
-        stats: {
-          ...friend.stats,
-          streak: friend.stats?.streak || Math.floor(Math.random() * 30) // Fallback for demo
-        }
-      }));
-      
-      setFriends(friendsWithStatus);
-    } catch (error) {
-      console.error('Error loading friends:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load friends list",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFriends();
-  }, []);
-
+  const userId = auth.currentUser?.uid || null;
+  
+  // Use the shared hooks instead of duplicating logic
+  const { friends, loading, error } = useFriends(userId);
+  
   const handleRemoveFriend = async (friendId: string) => {
-    const userId = auth.currentUser?.uid;
     if (!userId) return;
     
     try {
       await removeFriend(userId, friendId);
-      
-      // Update the friends list
-      setFriends(prevFriends => prevFriends.filter(friend => friend.id !== friendId));
       
       if (selectedFriendId === friendId) {
         onSelectFriend('');
@@ -87,17 +50,23 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
     }
   };
 
-  // If no real friends, use demo friends
+  // Always ensured to have some friends data for display
   const demoFriends: Friend[] = [
     {
       id: 'friend1',
       displayName: 'Sarah Johnson',
       photoURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       isOnline: true,
+      streak: 21,
+      totalApplications: 145,
       stats: {
         streak: 21,
-        todayCount: 24,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        totalApplications: 145,
+        weeklyApplications: 24,
+        monthlyApplications: 89,
+        responseRate: 62,
+        maxStreak: 25, // Add the required maxStreak property
+        lastUpdate: new Date().toISOString(),
         appliedJobs: []
       }
     },
@@ -106,10 +75,16 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
       displayName: 'Michael Chen',
       photoURL: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       isOnline: true,
+      streak: 12,
+      totalApplications: 98,
       stats: {
         streak: 12,
-        todayCount: 18,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        totalApplications: 98,
+        weeklyApplications: 18,
+        monthlyApplications: 65,
+        responseRate: 45,
+        maxStreak: 15, // Add the required maxStreak property
+        lastUpdate: new Date().toISOString(),
         appliedJobs: []
       }
     },
@@ -118,10 +93,16 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
       displayName: 'Jessica Wilson',
       photoURL: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       isOnline: false,
+      streak: 8,
+      totalApplications: 76,
       stats: {
         streak: 8,
-        todayCount: 12,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        totalApplications: 76,
+        weeklyApplications: 12,
+        monthlyApplications: 42,
+        responseRate: 38,
+        maxStreak: 18, // Add the required maxStreak property
+        lastUpdate: new Date().toISOString(),
         appliedJobs: []
       }
     },
@@ -130,16 +111,22 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
       displayName: 'David Thompson',
       photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
       isOnline: true,
+      streak: 4,
+      totalApplications: 32,
       stats: {
         streak: 4,
-        todayCount: 8,
-        lastUpdated: new Date().toISOString().split('T')[0],
+        totalApplications: 32,
+        weeklyApplications: 8, 
+        monthlyApplications: 24,
+        responseRate: 25,
+        maxStreak: 10, // Add the required maxStreak property
+        lastUpdate: new Date().toISOString(),
         appliedJobs: []
       }
     }
   ];
 
-  // Use demo friends until real friends are loaded or if there are no friends
+  // Use demo friends if there are no real friends loaded
   const displayFriends = friends.length > 0 ? friends : demoFriends;
 
   return (
@@ -243,7 +230,13 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
         userId={auth.currentUser?.uid || null} 
         open={addFriendOpen}
         onOpenChange={setAddFriendOpen}
-        onFriendAdded={loadFriends}
+        onFriendAdded={() => {
+          // Since we're using useFriends hook, it will automatically refresh
+          toast({
+            title: "Friend added",
+            description: "New friend has been added to your list",
+          });
+        }}
       />
     </div>
   );
