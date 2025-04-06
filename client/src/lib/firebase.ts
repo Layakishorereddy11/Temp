@@ -46,44 +46,57 @@ export const logoutUser = async () => {
 
 // Firestore Helper Functions
 
+// Maintain an in-memory store of friends for demo purposes
+// This allows newly added friends to persist during the session
+let inMemoryFriends: { [userId: string]: Friend[] } = {};
+
+// Initialize with default friends for new users
+const initializeDefaultFriends = (userId: string): Friend[] => {
+  const defaultFriends: Friend[] = [
+    {
+      id: "friend1",
+      displayName: "Alex Johnson",
+      photoURL: "https://randomuser.me/api/portraits/men/32.jpg",
+      totalApplications: 42,
+      streak: 7,
+      status: "online",
+      lastActive: new Date().toISOString()
+    },
+    {
+      id: "friend2",
+      displayName: "Taylor Smith",
+      photoURL: "https://randomuser.me/api/portraits/women/44.jpg",
+      totalApplications: 38,
+      streak: 5,
+      status: "offline",
+      lastActive: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+    },
+    {
+      id: "friend3",
+      displayName: "Jamie Lee",
+      photoURL: "https://randomuser.me/api/portraits/women/68.jpg",
+      totalApplications: 64,
+      streak: 12,
+      status: "online",
+      lastActive: new Date().toISOString()
+    }
+  ];
+  
+  // Store in our in-memory database
+  inMemoryFriends[userId] = defaultFriends;
+  return defaultFriends;
+};
+
 // Get user's friends list
 export const getFriends = async (userId: string): Promise<Friend[]> => {
   try {
-    // In a real app, we'd query the friends collection for this user
-    // For demo purposes, we'll return mock friends data
+    // Return friends from in-memory store if they exist
+    if (inMemoryFriends[userId]) {
+      return inMemoryFriends[userId];
+    }
     
-    // Generate demo friends with realistic data
-    const demoFriends: Friend[] = [
-      {
-        id: "friend1",
-        displayName: "Alex Johnson",
-        photoURL: "https://randomuser.me/api/portraits/men/32.jpg",
-        totalApplications: 42,
-        streak: 7,
-        status: "online",
-        lastActive: new Date().toISOString()
-      },
-      {
-        id: "friend2",
-        displayName: "Taylor Smith",
-        photoURL: "https://randomuser.me/api/portraits/women/44.jpg",
-        totalApplications: 38,
-        streak: 5,
-        status: "offline",
-        lastActive: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
-      },
-      {
-        id: "friend3",
-        displayName: "Jamie Lee",
-        photoURL: "https://randomuser.me/api/portraits/women/68.jpg",
-        totalApplications: 64,
-        streak: 12,
-        status: "online",
-        lastActive: new Date().toISOString()
-      }
-    ];
-    
-    return demoFriends;
+    // Otherwise initialize with default friends
+    return initializeDefaultFriends(userId);
   } catch (error) {
     console.error("Error getting friends:", error);
     throw error;
@@ -182,8 +195,12 @@ export const getUserStats = async (userId: string): Promise<ApplicationStats> =>
 // Add a new friend (for demo purposes)
 export const addFriend = async (userId: string, friendEmail: string): Promise<Friend> => {
   try {
-    // In a real app, we would search for the user by email and add them as a friend
-    // For demo purposes, return a mock friend
+    // Make sure we have an entry for this user
+    if (!inMemoryFriends[userId]) {
+      initializeDefaultFriends(userId);
+    }
+
+    // Create new friend with mock data
     const newFriend: Friend = {
       id: `friend-${Date.now()}`,
       displayName: friendEmail.split('@')[0], // Use part before @ as display name
@@ -193,6 +210,9 @@ export const addFriend = async (userId: string, friendEmail: string): Promise<Fr
       status: 'online',
       lastActive: new Date().toISOString()
     };
+    
+    // Add the new friend to the in-memory store
+    inMemoryFriends[userId].push(newFriend);
     
     return newFriend;
   } catch (error) {
@@ -204,10 +224,15 @@ export const addFriend = async (userId: string, friendEmail: string): Promise<Fr
 // Remove a friend (for demo purposes)
 export const removeFriend = async (userId: string, friendId: string): Promise<void> => {
   try {
-    // In a real app, we would update the user's friends list in Firestore
-    // For demo purposes, just log the removal
-    console.log(`Removing friend ${friendId} from user ${userId}`);
-    // No actual Firebase operation in this demo implementation
+    // Make sure we have an entry for this user
+    if (!inMemoryFriends[userId]) {
+      return Promise.resolve();
+    }
+    
+    // Remove the friend from the in-memory store
+    inMemoryFriends[userId] = inMemoryFriends[userId].filter(friend => friend.id !== friendId);
+    
+    console.log(`Removed friend ${friendId} from user ${userId}`);
     return Promise.resolve();
   } catch (error) {
     console.error("Error removing friend:", error);
