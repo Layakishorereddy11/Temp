@@ -112,7 +112,7 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
   const [selectedFriendStats, setSelectedFriendStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { lastMessage, sendMessage, connected } = useWebSocket();
+  const { lastMessage, sendMessage, connected, socket } = useWebSocket();
 
   // Function to load friends
   const loadFriends = useCallback(async () => {
@@ -168,8 +168,9 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
     try {
       setLoading(true);
       
-      // Find friend in current friends list
-      const friend = friends.find(f => f.id === friendId);
+      // Find friend in current friends list - check both id and uid fields
+      // Some entries might have id while others might have uid
+      const friend = friends.find(f => (f.id === friendId || f.uid === friendId));
       
       if (friend) {
         setSelectedFriend(friend);
@@ -178,8 +179,9 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
         if (friend.stats) {
           setSelectedFriendStats(friend.stats);
         } else {
-          // Otherwise, fetch stats
-          const stats = await getUserStats(friendId);
+          // Otherwise, fetch stats - use uid if available, otherwise use id
+          const friendUid = friend.uid || friend.id;
+          const stats = await getUserStats(friendUid);
           
           // If chart data doesn't exist, create it from the stats
           if (!stats.applicationChartData || !stats.streakChartData) {
@@ -193,7 +195,7 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
           
           // Update the friend in the friends list with the new stats
           const updatedFriends = friends.map(f => 
-            f.id === friendId ? { ...f, stats } : f
+            (f.id === friendId || f.uid === friendId) ? { ...f, stats } : f
           );
           setFriends(updatedFriends);
         }

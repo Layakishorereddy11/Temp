@@ -41,6 +41,7 @@ export interface ApplicationStats {
 // Friend interface
 export interface Friend {
   id: string;
+  uid?: string; // Added to match database structure
   displayName: string;
   photoURL: string | null;
   totalApplications: number;

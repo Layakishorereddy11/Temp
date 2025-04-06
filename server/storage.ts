@@ -16,7 +16,7 @@ import {
   type InsertUserStats
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Legacy user methods
@@ -104,7 +104,7 @@ export class DatabaseStorage implements IStorage {
     // Get actual friend data
     const friendIds = friendRelations.map(relation => relation.friendId);
     
-    // Create an array of conditions for each friendId
+    // Get friend data using OR conditions
     const friendsData = await Promise.all(
       friendIds.map(async (friendId) => {
         const result = await db
@@ -115,8 +115,26 @@ export class DatabaseStorage implements IStorage {
       })
     );
     
-    // Filter out any undefined results
-    return friendsData.filter(Boolean);
+    // Fetch user stats for these friends
+    const friendsWithStats = await Promise.all(
+      friendsData.map(async (friend) => {
+        // Get user stats if available
+        const stats = await this.getUserStats(friend.uid);
+        
+        // Add an id field that matches the uid for compatibility with the frontend
+        return {
+          ...friend,
+          // Ensure the friend has an id field that matches the uid
+          id: friend.uid,
+          // Ensure the display name is set
+          displayName: friend.displayName || friend.email.split('@')[0],
+          // Add stats if available
+          stats: stats || undefined
+        };
+      })
+    );
+    
+    return friendsWithStats;
   }
   
   async addFriend(userId: string, friendId: string): Promise<void> {

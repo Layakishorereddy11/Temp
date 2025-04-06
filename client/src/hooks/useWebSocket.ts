@@ -11,6 +11,7 @@ type WebSocketHookReturn = {
   readyState: number;
   connecting: boolean;
   connected: boolean;
+  socket: WebSocket | null;
 };
 
 export default function useWebSocket(): WebSocketHookReturn {
@@ -86,6 +87,7 @@ export default function useWebSocket(): WebSocketHookReturn {
     lastMessage,
     readyState,
     connecting: readyState === WebSocket.CONNECTING,
-    connected: readyState === WebSocket.OPEN
+    connected: readyState === WebSocket.OPEN,
+    socket: socketRef.current
   };
 }

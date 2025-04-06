@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addFriend } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import useWebSocket from '@/hooks/useWebSocket';
 
 interface AddFriendDialogProps {
   userId: string | null;
@@ -29,13 +30,27 @@ export default function AddFriendDialog({
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { socket, connected } = useWebSocket();
 
   const handleAddFriend = async () => {
     if (!userId || !email) return;
 
     setLoading(true);
     try {
-      await addFriend(userId, email);
+      const newFriend = await addFriend(userId, email);
+      
+      // Send WebSocket notification about the new friend
+      if (connected && socket) {
+        socket.send(JSON.stringify({
+          type: 'friend_added',
+          data: {
+            userId,
+            friendId: newFriend.id,
+            friendName: newFriend.displayName
+          }
+        }));
+      }
+      
       toast({
         title: "Friend request sent",
         description: "They'll be added to your friends list once they accept.",

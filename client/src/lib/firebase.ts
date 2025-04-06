@@ -71,14 +71,16 @@ export const getFriends = async (userId: string): Promise<Friend[]> => {
     
     // Transform the server response into the expected Friend type
     return friends.map((friend: any) => ({
-      id: friend.uid,
-      displayName: friend.displayName,
+      id: friend.id || friend.uid, // Ensure id is present
+      uid: friend.uid, // Keep the uid for reference
+      displayName: friend.displayName || friend.email?.split('@')[0] || 'Friend',
       photoURL: friend.photoURL,
       totalApplications: friend.totalApplications || 0,
       streak: friend.streak || 0,
       status: friend.lastActive && (new Date().getTime() - new Date(friend.lastActive).getTime() < 3600000) ? 'online' : 'offline',
       lastActive: friend.lastActive || new Date().toISOString(),
-      email: friend.email
+      email: friend.email,
+      stats: friend.stats // Include stats if available
     }));
   } catch (error) {
     console.error("Error getting friends:", error);
@@ -168,14 +170,16 @@ export const addFriend = async (userId: string, friendEmail: string): Promise<Fr
     
     // Transform API response to Friend type
     return {
-      id: newFriend.uid,
-      displayName: newFriend.displayName,
+      id: newFriend.id || newFriend.uid,
+      uid: newFriend.uid,
+      displayName: newFriend.displayName || newFriend.email?.split('@')[0] || 'Friend',
       photoURL: newFriend.photoURL,
       totalApplications: newFriend.totalApplications || 0,
       streak: newFriend.streak || 0,
       status: 'online',
       lastActive: newFriend.lastActive || new Date().toISOString(),
-      email: newFriend.email
+      email: newFriend.email,
+      stats: newFriend.stats // Include stats if available
     };
   } catch (error) {
     console.error("Error adding friend:", error);

@@ -174,11 +174,11 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
                   <div className="flex items-center">
                     <button 
                       className={`flex-grow flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                        selectedFriendId === friend.id 
+                        selectedFriendId === friend.id || selectedFriendId === friend.uid
                           ? 'bg-gray-700 text-white' 
                           : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                       }`}
-                      onClick={() => onSelectFriend(friend.id)}
+                      onClick={() => onSelectFriend(friend.id || friend.uid || '')}
                     >
                       <div className="relative">
                         <img 
@@ -189,7 +189,9 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
                         {friend.isOnline && (
                           <span 
                             className={`absolute bottom-0 right-2 block h-2 w-2 rounded-full ring-2 ${
-                              selectedFriendId === friend.id ? 'ring-gray-700' : 'ring-gray-800'
+                              selectedFriendId === friend.id || selectedFriendId === friend.uid 
+                                ? 'ring-gray-700' 
+                                : 'ring-gray-800'
                             } bg-green-400`}
                           ></span>
                         )}
@@ -214,7 +216,7 @@ export default function FriendsList({ onSelectFriend, selectedFriendId }: Friend
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => handleRemoveFriend(friend.id)}>
+                        <DropdownMenuItem onClick={() => handleRemoveFriend(friend.id || friend.uid || '')}>
                           <UserX className="mr-2 h-4 w-4" />
                           <span>Remove</span>
                         </DropdownMenuItem>
