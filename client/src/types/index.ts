@@ -1,71 +1,77 @@
-import { Timestamp } from "firebase/firestore";
+// Firebase User interface
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
 
-// Application tracking types
+// Job Application interface
 export interface JobApplication {
-  url: string;
+  id: string;
   title: string;
-  company?: string;
-  date: string;
-  timestamp: Timestamp;
-  lastTracked: boolean;
+  company: string;
+  url: string;
+  date: string; // YYYY-MM-DD format
+  status: 'applied' | 'interviewing' | 'rejected' | 'offer' | 'accepted';
   notes?: string;
   tags?: string[];
-  status?: 'applied' | 'interviewing' | 'rejected' | 'offer' | 'accepted';
+  salary?: number | string;
+  location?: string;
+  replied?: boolean;
+  updatedAt?: string;
 }
 
+// Application Statistics interface
 export interface ApplicationStats {
-  todayCount: number;
+  totalApplications: number;
+  weeklyApplications: number;
+  monthlyApplications: number;
   streak: number;
-  lastUpdated: string;
+  maxStreak: number;
+  responseRate: number;
+  lastUpdate: string;
   appliedJobs: JobApplication[];
-  totalResponses?: number;
-  responseRate?: number;
 }
 
-// Chart data type
+// Friend interface
+export interface Friend {
+  id: string;
+  displayName: string;
+  photoURL: string | null;
+  totalApplications: number;
+  streak: number;
+  status?: 'online' | 'offline';
+  lastActive?: string;
+  stats?: ApplicationStats;
+}
+
+// Leaderboard Entry interface
+export interface LeaderboardEntry {
+  id: string;
+  displayName: string;
+  photoURL: string | null;
+  score: number;
+  rank: number;
+  applications: number;
+  streak: number;
+}
+
+// Chart Data interface
 export interface ChartData {
   labels: string[];
   datasets: {
     label: string;
-    data: number[];
-    backgroundColor: string;
-    borderColor: string;
-    borderWidth: number;
+    data: (number | null)[];
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
+    borderWidth?: number;
     borderRadius?: number;
     barThickness?: number;
+    fill?: boolean;
+    tension?: number;
+    type?: string;
+    pointRadius?: number;
+    borderDash?: number[];
   }[];
-}
-
-// Social features types
-export interface Friend {
-  id: string;
-  displayName: string;
-  email: string;
-  photoURL?: string;
-  stats?: ApplicationStats;
-  isOnline?: boolean;
-  lastActive?: Timestamp;
-}
-
-export interface LeaderboardEntry {
-  id: string;
-  displayName: string;
-  photoURL?: string;
-  isCurrentUser: boolean;
-  streak: number;
-  todayCount: number;
-  totalApplications: number;
-}
-
-// Extension integration types
-export interface ExtensionMessage {
-  action: string;
-  data?: any;
-}
-
-export interface ExtensionStorageData {
-  userId?: string;
-  stats?: any;
-  user?: any;
-  settings?: any;
 }

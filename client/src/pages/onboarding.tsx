@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import useFirebaseAuth from '@/hooks/useFirebaseAuth';
+import { Loader2 } from 'lucide-react';
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
