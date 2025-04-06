@@ -1,52 +1,28 @@
 import { Timestamp } from "firebase/firestore";
 
-export interface User {
-  uid: string;
-  displayName?: string | null;
-  email?: string | null;
-  photoURL?: string | null;
-  createdAt?: Timestamp;
+// Application tracking types
+export interface JobApplication {
+  url: string;
+  title: string;
+  company?: string;
+  date: string;
+  timestamp: Timestamp;
+  lastTracked: boolean;
+  notes?: string;
+  tags?: string[];
+  status?: 'applied' | 'interviewing' | 'rejected' | 'offer' | 'accepted';
 }
 
 export interface ApplicationStats {
-  todayCount?: number;
-  streak?: number;
-  lastUpdated?: string;
-  appliedJobs?: JobApplication[];
+  todayCount: number;
+  streak: number;
+  lastUpdated: string;
+  appliedJobs: JobApplication[];
   totalResponses?: number;
   responseRate?: number;
 }
 
-export interface JobApplication {
-  url: string;
-  title: string;
-  date: string;
-  timestamp: Timestamp;
-  lastTracked: boolean;
-  tags?: string[];
-  company?: string;
-  notes?: string;
-}
-
-export interface Friend {
-  id: string;
-  displayName?: string | null;
-  email?: string | null;
-  photoURL?: string | null;
-  stats?: ApplicationStats;
-  isOnline?: boolean;
-}
-
-export interface LeaderboardEntry {
-  id: string;
-  displayName?: string | null;
-  photoURL?: string | null;
-  isCurrentUser: boolean;
-  streak: number;
-  todayCount: number;
-  totalApplications: number;
-}
-
+// Chart data type
 export interface ChartData {
   labels: string[];
   datasets: {
@@ -55,7 +31,41 @@ export interface ChartData {
     backgroundColor: string;
     borderColor: string;
     borderWidth: number;
-    borderRadius: number;
-    barThickness: number;
+    borderRadius?: number;
+    barThickness?: number;
   }[];
+}
+
+// Social features types
+export interface Friend {
+  id: string;
+  displayName: string;
+  email: string;
+  photoURL?: string;
+  stats?: ApplicationStats;
+  isOnline?: boolean;
+  lastActive?: Timestamp;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  displayName: string;
+  photoURL?: string;
+  isCurrentUser: boolean;
+  streak: number;
+  todayCount: number;
+  totalApplications: number;
+}
+
+// Extension integration types
+export interface ExtensionMessage {
+  action: string;
+  data?: any;
+}
+
+export interface ExtensionStorageData {
+  userId?: string;
+  stats?: any;
+  user?: any;
+  settings?: any;
 }

@@ -1,422 +1,377 @@
-import { db, auth } from './firebase';
+import { db, auth } from "./firebase";
 import { 
-  collection, 
   doc, 
-  setDoc, 
-  getDoc, 
   updateDoc, 
-  serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
+  Timestamp, 
+  arrayUnion, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  where, 
+  query, 
+  getDocs 
+} from "firebase/firestore";
+import { JobApplication, ApplicationStats, Friend } from "@/types";
 
 /**
- * Service to populate the user's Firestore data with sample data for demonstration
+ * Service to generate demo data for testing the application
  */
 export const demoDataService = {
   /**
-   * Checks if the user exists in Firestore
+   * Generate and insert demo job applications for the current user
    */
-  async checkUserExists(userId: string): Promise<boolean> {
-    const userDoc = await getDoc(doc(db, "users", userId));
-    return userDoc.exists();
-  },
-
-  /**
-   * Creates a new user document with default fields
-   */
-  async createUserDocument(userId: string, userData: any): Promise<void> {
-    await setDoc(doc(db, "users", userId), {
-      uid: userId,
-      displayName: userData.displayName || '',
-      email: userData.email || '',
-      photoURL: userData.photoURL || '',
-      createdAt: serverTimestamp(),
-      stats: {
-        todayCount: 0,
-        streak: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        appliedJobs: []
-      },
-      friends: []
-    });
-  },
-
-  /**
-   * Creates sample job application data for the current user
-   */
-  async populateApplicationData(userId: string): Promise<void> {
-    // Get current user document
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (!userDoc.exists()) return;
-
-    // Generate dates for the past 30 days
-    const dates = [];
-    for (let i = 30; i >= 0; i--) {
+  async generateDemoData(userId: string): Promise<ApplicationStats> {
+    if (!userId) throw new Error("User ID is required");
+    
+    // Get the user document
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      throw new Error("User document not found");
+    }
+    
+    // Generate demo job applications
+    const today = new Date();
+    const applications: JobApplication[] = [];
+    
+    // For the past 14 days
+    for (let i = 0; i < 14; i++) {
       const date = new Date();
-      date.setDate(date.getDate() - i);
-      dates.push(date);
-    }
-
-    // Sample company and job data
-    const companies = [
-      { name: 'TechCorp', domain: 'techcorp.com' },
-      { name: 'InnovateTech', domain: 'innovatetech.io' },
-      { name: 'DigitalSolutions', domain: 'digitalsolutions.co' },
-      { name: 'CloudWave', domain: 'cloudwave.tech' },
-      { name: 'CodeMasters', domain: 'codemasters.dev' },
-      { name: 'DataInsights', domain: 'datainsights.ai' },
-      { name: 'WebFrontier', domain: 'webfrontier.io' },
-      { name: 'AppGenius', domain: 'appgenius.app' }
-    ];
-
-    const positions = [
-      'Frontend Developer',
-      'Backend Engineer',
-      'Full Stack Developer',
-      'UI/UX Designer',
-      'Product Manager',
-      'DevOps Engineer',
-      'Data Scientist',
-      'Mobile Developer',
-      'QA Engineer',
-      'Technical Writer'
-    ];
-
-    const tags = [
-      ['React', 'TypeScript', 'Remote'],
-      ['Node.js', 'Express', 'MongoDB'],
-      ['React', 'Next.js', 'GraphQL'],
-      ['Figma', 'UI/UX', 'Hybrid'],
-      ['Product', 'Agile', 'Scrum'],
-      ['AWS', 'Docker', 'Kubernetes'],
-      ['Python', 'TensorFlow', 'Remote'],
-      ['React Native', 'TypeScript', 'Mobile'],
-      ['Jest', 'Cypress', 'Testing'],
-      ['Technical Writing', 'Documentation', 'Remote']
-    ];
-
-    // Generate applications with progressive pattern
-    // Early days (1-10): 0-2 applications per day
-    // Mid days (11-20): 2-5 applications per day
-    // Recent days (21-30): 5-10 applications per day
-    const appliedJobs = [];
-    let totalApplications = 0;
-    let streakDays = 0;
-    let lastApplicationDate = null;
-
-    for (let i = 0; i < dates.length; i++) {
-      const date = dates[i];
-      const dateStr = date.toISOString().split('T')[0];
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
       
-      // Determine how many applications for this day
-      let applicationsCount = 0;
-      if (i < 10) {
-        // Early days: 0-2 applications (less activity)
-        applicationsCount = Math.floor(Math.random() * 3);
-      } else if (i < 20) {
-        // Mid days: 2-5 applications (increasing activity)
-        applicationsCount = Math.floor(Math.random() * 4) + 2;
+      // Generate 0-3 applications per day
+      const count = Math.floor(Math.random() * 4);
+      
+      for (let j = 0; j < count; j++) {
+        const application: JobApplication = {
+          url: this.getDemoJobURL(),
+          title: this.getDemoJobTitle(),
+          company: this.getDemoCompany(),
+          date: dateString,
+          timestamp: Timestamp.fromDate(new Date(date.getTime() - j * 3600000)),
+          lastTracked: i === 0 && j === 0, // Mark the most recent as lastTracked
+          tags: this.getDemoTags(),
+          status: this.getDemoStatus()
+        };
+        
+        applications.push(application);
+      }
+    }
+    
+    // Sort by timestamp (newest first)
+    applications.sort((a, b) => 
+      b.timestamp.toMillis() - a.timestamp.toMillis()
+    );
+    
+    // Calculate streak and today's count
+    const todayString = today.toISOString().split('T')[0];
+    const todayCount = applications.filter(app => app.date === todayString).length;
+    
+    // Calculate streak (consecutive days with at least one application)
+    let streak = 0;
+    const daysWithApplications = new Set(applications.map(app => app.date));
+    
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+      
+      if (daysWithApplications.has(dateString)) {
+        streak++;
       } else {
-        // Recent days: 5-10 applications (high activity)
-        applicationsCount = Math.floor(Math.random() * 6) + 5;
-      }
-      
-      // Create applications for this day
-      for (let j = 0; j < applicationsCount; j++) {
-        // Select random company and position
-        const company = companies[Math.floor(Math.random() * companies.length)];
-        const position = positions[Math.floor(Math.random() * positions.length)];
-        const tagSet = tags[Math.floor(Math.random() * tags.length)];
-        
-        // Generate random timestamps throughout the day
-        const hours = Math.floor(Math.random() * 8) + 9; // 9 AM to 5 PM
-        const minutes = Math.floor(Math.random() * 60);
-        const seconds = Math.floor(Math.random() * 60);
-        const applicationDate = new Date(date);
-        applicationDate.setHours(hours, minutes, seconds);
-        
-        const title = `${position} at ${company.name}`;
-        const url = `https://${company.domain}/careers/${position.toLowerCase().replace(/ /g, '-')}`;
-        
-        // Add the application
-        appliedJobs.push({
-          title,
-          url,
-          company: company.name,
-          date: dateStr,
-          timestamp: Timestamp.fromDate(applicationDate),
-          lastTracked: i === dates.length - 1 && j === applicationsCount - 1, // Only the most recent is lastTracked
-          tags: tagSet
-        });
-        
-        totalApplications++;
-      }
-      
-      // Update streak calculation
-      if (applicationsCount > 0) {
-        if (!lastApplicationDate || isYesterday(lastApplicationDate, date)) {
-          streakDays++;
-        } else if (!isYesterday(lastApplicationDate, date)) {
-          // Reset streak if there's a gap
-          streakDays = 1;
-        }
-        lastApplicationDate = date;
+        break;
       }
     }
     
-    // Calculate other stats
-    const totalResponses = Math.floor(totalApplications * (Math.random() * 0.3 + 0.1)); // 10-40% response rate
-    const responseRate = totalResponses / totalApplications;
+    // Update user document with demo data
+    const stats: ApplicationStats = {
+      todayCount,
+      streak,
+      lastUpdated: todayString,
+      appliedJobs: applications,
+      totalResponses: Math.floor(applications.length * 0.3),
+      responseRate: 30
+    };
     
-    // Today's applications count (from the last day)
-    const today = new Date().toISOString().split('T')[0];
-    const todayCount = appliedJobs.filter(job => job.date === today).length;
+    await updateDoc(userRef, { stats });
     
-    // Update user document with generated data
-    await updateDoc(doc(db, "users", userId), {
-      stats: {
-        todayCount,
-        streak: streakDays,
-        lastUpdated: today,
-        appliedJobs,
-        totalResponses,
-        responseRate
-      }
-    });
+    return stats;
   },
-
+  
   /**
-   * Creates demo friend accounts if they don't exist and links them to the current user
+   * Generate demo friends for the current user
    */
-  async populateFriendsData(userId: string): Promise<void> {
-    const demoFriends = [
+  async generateDemoFriends(userId: string): Promise<Friend[]> {
+    if (!userId) throw new Error("User ID is required");
+    
+    // Get the user document
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      throw new Error("User document not found");
+    }
+    
+    // Create demo friends
+    const demoFriends: { 
+      id: string; 
+      name: string; 
+      email: string; 
+      stats: ApplicationStats; 
+    }[] = [
       {
-        id: 'demo-friend-1',
-        displayName: 'Sarah Johnson',
-        email: 'sarah.johnson@example.com',
-        photoURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-        streak: 21,
-        applications: 85
+        id: "demo-friend-1",
+        name: "Alex Johnson",
+        email: "alex.j@example.com",
+        stats: this.generateUserStats(5, 12)
       },
       {
-        id: 'demo-friend-2',
-        displayName: 'Michael Chen',
-        email: 'michael.chen@example.com',
-        photoURL: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-        streak: 12,
-        applications: 65
+        id: "demo-friend-2",
+        name: "Sam Rivera",
+        email: "sam.r@example.com",
+        stats: this.generateUserStats(3, 8)
       },
       {
-        id: 'demo-friend-3',
-        displayName: 'Jessica Wilson',
-        email: 'jessica.wilson@example.com',
-        photoURL: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-        streak: 8,
-        applications: 42
-      },
-      {
-        id: 'demo-friend-4',
-        displayName: 'David Thompson',
-        email: 'david.thompson@example.com',
-        photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-        streak: 4,
-        applications: 37
+        id: "demo-friend-3",
+        name: "Taylor Kim",
+        email: "taylor.k@example.com",
+        stats: this.generateUserStats(7, 21)
       }
     ];
-
-    // Create each demo friend and connect them to the user
-    const friendIds = [];
+    
+    // Create friend documents in Firestore
+    const friendIds: string[] = [];
+    
     for (const friend of demoFriends) {
-      const friendDoc = await getDoc(doc(db, "users", friend.id));
+      const friendRef = doc(db, "users", friend.id);
+      const friendDoc = await getDoc(friendRef);
       
+      // Only create if it doesn't exist
       if (!friendDoc.exists()) {
-        // Create the friend document
-        await setDoc(doc(db, "users", friend.id), {
+        await setDoc(friendRef, {
           uid: friend.id,
-          displayName: friend.displayName,
+          displayName: friend.name,
           email: friend.email,
-          photoURL: friend.photoURL,
-          createdAt: serverTimestamp(),
-          stats: await this.generateFriendStats(friend.streak, friend.applications),
-          friends: [userId] // Add the current user as their friend
+          photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.id}`,
+          createdAt: Timestamp.now(),
+          stats: friend.stats,
+          friends: [userId] // Connect with the current user
         });
-      } else {
-        // Update the friend's friends list to include the current user
-        const friendData = friendDoc.data();
-        const friendsList = friendData.friends || [];
-        if (!friendsList.includes(userId)) {
-          await updateDoc(doc(db, "users", friend.id), {
-            friends: [...friendsList, userId]
-          });
-        }
       }
       
       friendIds.push(friend.id);
     }
     
-    // Update the current user's friends list
-    const userDoc = await getDoc(doc(db, "users", userId));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const existingFriends = userData.friends || [];
-      const newFriends = friendIds.filter(id => !existingFriends.includes(id));
-      
-      if (newFriends.length > 0) {
-        await updateDoc(doc(db, "users", userId), {
-          friends: [...existingFriends, ...newFriends]
-        });
-      }
-    }
+    // Update user's friends list
+    await updateDoc(userRef, {
+      friends: [...friendIds]
+    });
+    
+    // Return the created friends
+    const friends: Friend[] = demoFriends.map(f => ({
+      id: f.id,
+      displayName: f.name,
+      email: f.email,
+      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.id}`,
+      stats: f.stats,
+      isOnline: Math.random() > 0.5,
+      lastActive: Timestamp.now()
+    }));
+    
+    return friends;
   },
-
+  
   /**
-   * Generate realistic stats for a friend
+   * Helper to generate user stats
    */
-  async generateFriendStats(streakDays: number, totalApplications: number): Promise<any> {
-    // Generate dates for the past 30 days
-    const dates = [];
-    for (let i = 30; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      dates.push(date);
-    }
-
-    // Sample company and job data (same as before)
-    const companies = [
-      { name: 'TechCorp', domain: 'techcorp.com' },
-      { name: 'InnovateTech', domain: 'innovatetech.io' },
-      { name: 'DigitalSolutions', domain: 'digitalsolutions.co' },
-      { name: 'CloudWave', domain: 'cloudwave.tech' },
-      { name: 'CodeMasters', domain: 'codemasters.dev' }
-    ];
-
-    const positions = [
-      'Frontend Developer',
-      'Backend Engineer',
-      'Full Stack Developer',
-      'UI/UX Designer',
-      'Product Manager'
-    ];
-
-    const tags = [
-      ['React', 'TypeScript', 'Remote'],
-      ['Node.js', 'Express', 'MongoDB'],
-      ['React', 'Next.js', 'GraphQL'],
-      ['Figma', 'UI/UX', 'Hybrid'],
-      ['Product', 'Agile', 'Scrum']
-    ];
-
-    // Calculate daily applications needed to reach the total
-    const avgApplicationsPerDay = totalApplications / streakDays;
+  generateUserStats(streak: number, totalApplications: number): ApplicationStats {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    const applications: JobApplication[] = [];
     
-    // Generate applications with a realistic pattern
-    const appliedJobs = [];
-    let remainingApplications = totalApplications;
-
-    for (let i = 0; i < dates.length; i++) {
-      const date = dates[i];
-      const dateStr = date.toISOString().split('T')[0];
+    // Generate applications for the streak duration
+    for (let i = 0; i < streak; i++) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
       
-      // If we're in the streak days, add applications
-      let applicationsCount = 0;
-      if (i >= dates.length - streakDays) {
-        applicationsCount = Math.min(
-          Math.max(1, Math.round(avgApplicationsPerDay + (Math.random() * 4 - 2))),
-          remainingApplications
-        );
-        remainingApplications -= applicationsCount;
-      }
+      // Generate 1-3 applications per day
+      const count = Math.floor(Math.random() * 3) + 1;
       
-      // Create applications for this day
-      for (let j = 0; j < applicationsCount; j++) {
-        // Select random company and position
-        const company = companies[Math.floor(Math.random() * companies.length)];
-        const position = positions[Math.floor(Math.random() * positions.length)];
-        const tagSet = tags[Math.floor(Math.random() * tags.length)];
-        
-        // Generate random timestamps throughout the day
-        const hours = Math.floor(Math.random() * 8) + 9; // 9 AM to 5 PM
-        const minutes = Math.floor(Math.random() * 60);
-        const applicationDate = new Date(date);
-        applicationDate.setHours(hours, minutes);
-        
-        const title = `${position} at ${company.name}`;
-        const url = `https://${company.domain}/careers/${position.toLowerCase().replace(/ /g, '-')}`;
-        
-        // Add the application
-        appliedJobs.push({
-          title,
-          url,
-          company: company.name,
-          date: dateStr,
-          timestamp: Timestamp.fromDate(applicationDate),
-          lastTracked: i === dates.length - 1 && j === applicationsCount - 1,
-          tags: tagSet
+      for (let j = 0; j < count; j++) {
+        applications.push({
+          url: this.getDemoJobURL(),
+          title: this.getDemoJobTitle(),
+          company: this.getDemoCompany(),
+          date: dateString,
+          timestamp: Timestamp.fromDate(new Date(date.getTime() - j * 3600000)),
+          lastTracked: i === 0 && j === 0,
+          tags: this.getDemoTags(),
+          status: this.getDemoStatus()
         });
       }
     }
     
-    // Calculate other stats
-    const totalResponses = Math.floor(totalApplications * (Math.random() * 0.3 + 0.1)); // 10-40% response rate
-    const responseRate = totalResponses / totalApplications;
+    // Generate more random applications if needed
+    while (applications.length < totalApplications) {
+      const daysAgo = streak + Math.floor(Math.random() * 10);
+      const date = new Date();
+      date.setDate(today.getDate() - daysAgo);
+      const dateString = date.toISOString().split('T')[0];
+      
+      applications.push({
+        url: this.getDemoJobURL(),
+        title: this.getDemoJobTitle(),
+        company: this.getDemoCompany(),
+        date: dateString,
+        timestamp: Timestamp.fromDate(date),
+        lastTracked: false,
+        tags: this.getDemoTags(),
+        status: this.getDemoStatus()
+      });
+    }
     
-    // Today's applications count
-    const today = new Date().toISOString().split('T')[0];
-    const todayCount = appliedJobs.filter(job => job.date === today).length;
+    // Sort by timestamp (newest first)
+    applications.sort((a, b) => 
+      b.timestamp.toMillis() - a.timestamp.toMillis()
+    );
     
-    // Return stats object
     return {
-      todayCount,
-      streak: streakDays,
-      lastUpdated: today,
-      appliedJobs,
-      totalResponses,
-      responseRate
+      todayCount: applications.filter(app => app.date === todayString).length,
+      streak,
+      lastUpdated: todayString,
+      appliedJobs: applications,
+      totalResponses: Math.floor(totalApplications * 0.3),
+      responseRate: 30
     };
   },
-
+  
   /**
-   * Populates everything at once
+   * Helper functions to generate random job data
    */
-  async populateAllDemoData(userId: string): Promise<boolean> {
-    try {
-      const exists = await this.checkUserExists(userId);
-      
-      if (!exists) {
-        const user = auth.currentUser;
-        await this.createUserDocument(userId, {
-          displayName: user?.displayName,
-          email: user?.email,
-          photoURL: user?.photoURL
-        });
+  getDemoJobTitle(): string {
+    const titles = [
+      "Software Developer",
+      "Frontend Engineer",
+      "Full Stack Developer",
+      "React Developer",
+      "Software Engineer",
+      "Web Developer",
+      "UI Developer",
+      "JavaScript Developer",
+      "TypeScript Developer",
+      "Junior Developer",
+      "Senior Developer",
+      "Mobile Developer",
+      "DevOps Engineer",
+      "Backend Developer",
+      "React Native Developer"
+    ];
+    
+    return titles[Math.floor(Math.random() * titles.length)];
+  },
+  
+  getDemoCompany(): string {
+    const companies = [
+      "Google",
+      "Microsoft",
+      "Amazon",
+      "Apple",
+      "Meta",
+      "Netflix",
+      "Airbnb",
+      "Dropbox",
+      "Shopify",
+      "Spotify",
+      "Twitter",
+      "LinkedIn",
+      "Uber",
+      "Lyft",
+      "Square",
+      "Stripe",
+      "Slack",
+      "GitHub",
+      "Atlassian",
+      "Adobe"
+    ];
+    
+    return companies[Math.floor(Math.random() * companies.length)];
+  },
+  
+  getDemoJobURL(): string {
+    const domains = [
+      "linkedin.com",
+      "indeed.com",
+      "glassdoor.com",
+      "monster.com",
+      "angellist.com",
+      "hired.com",
+      "dice.com",
+      "zip-recruiter.com",
+      "stackoverflow.com",
+      "wellfound.com",
+      "remote-ok.com"
+    ];
+    
+    const domain = domains[Math.floor(Math.random() * domains.length)];
+    const id = Math.floor(10000000 + Math.random() * 90000000);
+    
+    return `https://www.${domain}/jobs/${id}`;
+  },
+  
+  getDemoTags(): string[] {
+    const allTags = [
+      "Remote",
+      "In-Office",
+      "Hybrid",
+      "Full-Time",
+      "Contract",
+      "Part-Time",
+      "Entry-Level",
+      "Mid-Level",
+      "Senior",
+      "JavaScript",
+      "React",
+      "Node",
+      "TypeScript",
+      "Python",
+      "Java",
+      "C#",
+      "SQL",
+      "AWS",
+      "DevOps"
+    ];
+    
+    const tags: string[] = [];
+    const numTags = 1 + Math.floor(Math.random() * 3); // 1-3 tags
+    
+    for (let i = 0; i < numTags; i++) {
+      const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
+      if (!tags.includes(randomTag)) {
+        tags.push(randomTag);
       }
-      
-      // Populate with application data
-      await this.populateApplicationData(userId);
-      
-      // Populate with friends data
-      await this.populateFriendsData(userId);
-      
-      return true;
-    } catch (error) {
-      console.error('Error populating demo data:', error);
-      return false;
+    }
+    
+    return tags;
+  },
+  
+  getDemoStatus(): 'applied' | 'interviewing' | 'rejected' | 'offer' | 'accepted' {
+    const statuses: ('applied' | 'interviewing' | 'rejected' | 'offer' | 'accepted')[] = [
+      'applied',
+      'interviewing',
+      'rejected',
+      'offer',
+      'accepted'
+    ];
+    
+    // More likely to be 'applied' than other statuses
+    const random = Math.random();
+    if (random < 0.7) {
+      return 'applied';
+    } else {
+      return statuses[Math.floor(random * 4) + 1];
     }
   }
 };
-
-// Helper function to check if two dates are consecutive
-function isYesterday(date1: Date, date2: Date): boolean {
-  const day1 = new Date(date1);
-  const day2 = new Date(date2);
-  
-  // Reset hours to compare just the dates
-  day1.setHours(0, 0, 0, 0);
-  day2.setHours(0, 0, 0, 0);
-  
-  // Calculate difference in days
-  const diffTime = Math.abs(day2.getTime() - day1.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return diffDays === 1;
-}

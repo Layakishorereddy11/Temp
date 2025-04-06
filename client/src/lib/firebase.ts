@@ -1,6 +1,4 @@
-import { initializeApp } from "firebase/app";
 import { 
-  getAuth, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   updateProfile,
@@ -13,7 +11,6 @@ import {
   onAuthStateChanged
 } from "firebase/auth";
 import { 
-  getFirestore, 
   collection, 
   doc, 
   setDoc, 
@@ -31,18 +28,11 @@ import {
   orderBy
 } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+// Import shared Firebase configuration
+import app, { auth, db } from './firebaseShared';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Re-export Firebase services for backward compatibility
+export { auth, db };
 
 // Authentication helpers
 export const loginWithEmail = async (email: string, password: string) => {
