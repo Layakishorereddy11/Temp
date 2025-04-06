@@ -188,7 +188,7 @@ export default function FriendDashboard({ friend, stats, loading, onClose }: Fri
                         r="40" 
                         fill="none" 
                         stroke="currentColor" 
-                        className="text-primary-500" 
+                        className="text-primary" 
                         strokeWidth="10" 
                         strokeDasharray="251.2" 
                         strokeDashoffset={251.2 * (1 - (stats?.totalApplications || 0) / 1000)} 
@@ -219,7 +219,7 @@ export default function FriendDashboard({ friend, stats, loading, onClose }: Fri
                     </div>
                     <div>
                       <p className="text-sm font-medium">Current Streak</p>
-                      <p className="text-2xl font-bold text-primary-500">{stats?.streak || 0} days</p>
+                      <p className="text-2xl font-bold text-primary">{stats?.streak || 0} days</p>
                     </div>
                   </div>
                 </div>
