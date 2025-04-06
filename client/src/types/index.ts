@@ -57,10 +57,10 @@ export interface LeaderboardEntry {
   id: string;
   displayName: string;
   photoURL: string | null;
-  score: number;
-  rank: number;
-  applications: number;
+  isCurrentUser: boolean;
   streak: number;
+  todayCount: number;
+  totalApplications: number;
 }
 
 // Chart Data interface

@@ -1,19 +1,32 @@
+import { useState } from 'react';
 import { LeaderboardEntry } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowDown01, Flame } from 'lucide-react';
 
 interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
   loading?: boolean;
 }
 
+type SortMode = 'streak' | 'total';
+
 export default function LeaderboardTable({ entries, loading = false }: LeaderboardTableProps) {
+  const [sortMode, setSortMode] = useState<SortMode>('streak');
+  
   if (loading) {
     return (
-      <div className="bg-white shadow rounded-lg p-4">
+      <div className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Leaderboard</h3>
+          <h3 className="text-lg font-medium">Leaderboard</h3>
         </div>
         <div className="flex justify-center py-8">
-          <svg className="animate-spin h-8 w-8 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
@@ -22,92 +35,71 @@ export default function LeaderboardTable({ entries, loading = false }: Leaderboa
     );
   }
 
-  // If no entries, use demo data
-  const demoEntries: LeaderboardEntry[] = [
-    {
-      id: '1',
-      displayName: 'Sarah Johnson',
-      photoURL: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      isCurrentUser: false,
-      streak: 21,
-      todayCount: 24,
-      totalApplications: 432
-    },
-    {
-      id: '2',
-      displayName: 'You',
-      photoURL: '',
-      isCurrentUser: true,
-      streak: 17,
-      todayCount: 15,
-      totalApplications: 342
-    },
-    {
-      id: '3',
-      displayName: 'Michael Chen',
-      photoURL: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      isCurrentUser: false,
-      streak: 12,
-      todayCount: 18,
-      totalApplications: 298
-    },
-    {
-      id: '4',
-      displayName: 'Jessica Wilson',
-      photoURL: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      isCurrentUser: false,
-      streak: 8,
-      todayCount: 12,
-      totalApplications: 217
-    },
-    {
-      id: '5',
-      displayName: 'David Thompson',
-      photoURL: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-      isCurrentUser: false,
-      streak: 4,
-      todayCount: 8,
-      totalApplications: 165
-    }
-  ];
+  const displayEntries = [...entries]
+    // Sort based on the current sort mode
+    .sort((a, b) => {
+      if (sortMode === 'streak') {
+        return b.streak - a.streak;
+      } else {
+        return b.totalApplications - a.totalApplications;
+      }
+    });
 
-  const displayEntries = entries.length > 0 ? entries : demoEntries;
+  const handleSortChange = (value: string) => {
+    setSortMode(value as SortMode);
+  };
 
   return (
-    <div className="bg-white shadow rounded-lg p-4">
+    <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-gray-900">Leaderboard</h3>
-        <div className="flex items-center">
-          <button className="text-sm text-primary-500 hover:text-primary-600">
-            View All
-          </button>
+        <div className="flex gap-2 items-center">
+          <p className="text-sm text-muted-foreground">Sort by:</p>
+          <Select value={sortMode} onValueChange={handleSortChange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="streak">
+                <div className="flex items-center">
+                  <Flame className="mr-2 h-4 w-4 text-orange-500" />
+                  Streak
+                </div>
+              </SelectItem>
+              <SelectItem value="total">
+                <div className="flex items-center">
+                  <ArrowDown01 className="mr-2 h-4 w-4 text-blue-500" />
+                  Total Applications
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
-      <div className="overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden rounded-md border">
+        <table className="min-w-full divide-y">
+          <thead className="bg-muted/50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Rank
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Name
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Streak
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Today
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Total
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y">
             {displayEntries.map((entry, index) => (
-              <tr key={entry.id} className={entry.isCurrentUser ? 'bg-gray-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <tr key={entry.id} className={entry.isCurrentUser ? 'bg-muted/20' : ''}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   {index + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -120,22 +112,28 @@ export default function LeaderboardTable({ entries, loading = false }: Leaderboa
                       />
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium">
                         {entry.isCurrentUser ? 'You' : entry.displayName}
                       </div>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${sortMode === 'streak' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-muted text-muted-foreground'}`}>
                     {entry.streak} 🔥
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {entry.todayCount}
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  {entry.todayCount > 0 ? (
+                    <span className="font-medium text-green-600 dark:text-green-400">{entry.todayCount}</span>
+                  ) : (
+                    <span className="text-muted-foreground">{entry.todayCount}</span>
+                  )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {entry.totalApplications}
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={sortMode === 'total' ? 'font-medium text-blue-600 dark:text-blue-400' : ''}>
+                    {entry.totalApplications}
+                  </span>
                 </td>
               </tr>
             ))}

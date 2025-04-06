@@ -49,35 +49,36 @@ export default function DashboardPage() {
   const loading = authLoading || statsLoading;
   
   // Generate leaderboard data from friends
+  const currentDate = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+  
+  // Create leaderboard entries from user and friends
   const leaderboardEntries = [
     // Add current user to leaderboard
     ...(stats ? [{
       id: user?.uid || '',
       displayName: user?.displayName || 'You',
       photoURL: user?.photoURL || null,
-      score: stats.totalApplications * 10 + stats.streak * 20,
-      rank: 0, // Will be calculated
-      applications: stats.totalApplications,
-      streak: stats.streak
+      isCurrentUser: true,
+      streak: stats.streak,
+      todayCount: stats.appliedJobs.filter(job => job.date === currentDate).length,
+      totalApplications: stats.totalApplications
     }] : []),
     // Add friends
-    ...friends.map(friend => ({
-      id: friend.id,
-      displayName: friend.displayName,
-      photoURL: friend.photoURL || null,
-      score: friend.totalApplications * 10 + friend.streak * 20,
-      rank: 0, // Will be calculated
-      applications: friend.totalApplications,
-      streak: friend.streak
-    }))
-  ]
-  // Sort by score (descending)
-  .sort((a, b) => b.score - a.score)
-  // Assign ranks
-  .map((entry, index) => ({
-    ...entry,
-    rank: index + 1
-  }));
+    ...friends.map(friend => {
+      // Calculate todayCount for each friend
+      const friendTodayCount = friend.stats?.appliedJobs?.filter(job => job.date === currentDate).length || 0;
+      
+      return {
+        id: friend.id,
+        displayName: friend.displayName,
+        photoURL: friend.photoURL || null,
+        isCurrentUser: false,
+        streak: friend.streak,
+        todayCount: friendTodayCount,
+        totalApplications: friend.totalApplications
+      };
+    })
+  ];
   
   return (
     <div className="flex min-h-screen bg-background">
