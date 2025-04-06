@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Friend } from '@/types';
 import { removeFriend } from '@/lib/firebase';
-import { auth } from '@/lib/firebase';
+import { auth } from '@/lib/firebaseShared';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import AddFriendDialog from './AddFriendDialog';

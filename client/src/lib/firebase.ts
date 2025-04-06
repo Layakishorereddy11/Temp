@@ -1,25 +1,8 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, signOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { signOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { isExtensionEnvironment } from "./extensionAdapter";
 import { Friend, ApplicationStats, JobApplication } from '@/types';
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  messagingSenderId: "", // Not needed for basic auth
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase - different instance for extension vs web app
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Authentication and Firestore
-const auth = getAuth(app);
-const db = getFirestore(app);
+import { auth, db, app } from './firebaseShared';
 
 // Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -46,193 +29,172 @@ export const logoutUser = async () => {
 
 // Firestore Helper Functions
 
-// Maintain an in-memory store of friends for demo purposes
-// This allows newly added friends to persist during the session
-let inMemoryFriends: { [userId: string]: Friend[] } = {};
+// API Helper Functions
+const API_BASE = '';  // Empty string for relative URLs
 
-// Initialize with default friends for new users
-const initializeDefaultFriends = (userId: string): Friend[] => {
-  const defaultFriends: Friend[] = [
-    {
-      id: "friend1",
-      displayName: "Alex Johnson",
-      photoURL: "https://randomuser.me/api/portraits/men/32.jpg",
-      totalApplications: 42,
-      streak: 7,
-      status: "online",
-      lastActive: new Date().toISOString()
-    },
-    {
-      id: "friend2",
-      displayName: "Taylor Smith",
-      photoURL: "https://randomuser.me/api/portraits/women/44.jpg",
-      totalApplications: 38,
-      streak: 5,
-      status: "offline",
-      lastActive: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
-    },
-    {
-      id: "friend3",
-      displayName: "Jamie Lee",
-      photoURL: "https://randomuser.me/api/portraits/women/68.jpg",
-      totalApplications: 64,
-      streak: 12,
-      status: "online",
-      lastActive: new Date().toISOString()
+// Helper function to call the API
+const apiRequest = async (url: string, options: RequestInit = {}) => {
+  try {
+    const response = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API request failed with status ${response.status}`);
     }
-  ];
-  
-  // Store in our in-memory database
-  inMemoryFriends[userId] = defaultFriends;
-  return defaultFriends;
+    
+    // For 204 No Content
+    if (response.status === 204) {
+      return null;
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API Request Error:', error);
+    throw error;
+  }
 };
 
 // Get user's friends list
 export const getFriends = async (userId: string): Promise<Friend[]> => {
   try {
-    // Return friends from in-memory store if they exist
-    if (inMemoryFriends[userId]) {
-      return inMemoryFriends[userId];
+    if (!userId) {
+      return [];
     }
     
-    // Otherwise initialize with default friends
-    return initializeDefaultFriends(userId);
+    const friends = await apiRequest(`/api/firebase/users/${userId}/friends`);
+    
+    // Transform the server response into the expected Friend type
+    return friends.map((friend: any) => ({
+      id: friend.uid,
+      displayName: friend.displayName,
+      photoURL: friend.photoURL,
+      totalApplications: friend.totalApplications || 0,
+      streak: friend.streak || 0,
+      status: friend.lastActive && (new Date().getTime() - new Date(friend.lastActive).getTime() < 3600000) ? 'online' : 'offline',
+      lastActive: friend.lastActive || new Date().toISOString(),
+      email: friend.email
+    }));
   } catch (error) {
     console.error("Error getting friends:", error);
-    throw error;
+    // Return empty array on error to prevent UI breakage
+    return [];
   }
 };
 
 // Get user's statistics
 export const getUserStats = async (userId: string): Promise<ApplicationStats> => {
   try {
-    // In a real app, we'd fetch this from Firestore
-    // For demo purposes, create some sample data based on userId
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
     
-    // Generate some applications with different statuses
-    const generateDemoApplications = (): JobApplication[] => {
-      const applications: JobApplication[] = [];
-      const companies = ["Google", "Apple", "Microsoft", "Amazon", "Facebook", "Twitter", "LinkedIn", "Airbnb", "Uber", "Netflix"];
-      const statuses: ("applied" | "interviewing" | "rejected" | "offer" | "accepted")[] = ["applied", "interviewing", "rejected", "offer", "accepted"];
-      const tags = ["Remote", "Full-time", "Entry Level", "Senior", "Engineering", "Design", "Product", "Marketing"];
-      
-      // Generate between 10-20 applications
-      const count = 10 + Math.floor(Math.random() * 10);
-      
-      for (let i = 0; i < count; i++) {
-        // Generate date within last 30 days
-        const date = new Date();
-        date.setDate(date.getDate() - Math.floor(Math.random() * 30));
-        
-        // Generate application
-        applications.push({
-          id: `app-${i}`,
-          title: `${companies[Math.floor(Math.random() * companies.length)]} ${["Software Engineer", "Product Manager", "Designer", "Data Scientist"][Math.floor(Math.random() * 4)]}`,
-          company: companies[Math.floor(Math.random() * companies.length)],
-          url: `https://example.com/job/${i}`,
-          date: date.toISOString().split('T')[0],
-          status: statuses[Math.floor(Math.random() * statuses.length)],
-          tags: [tags[Math.floor(Math.random() * tags.length)], tags[Math.floor(Math.random() * tags.length)]],
-          notes: Math.random() > 0.5 ? "Applied through company website" : undefined
-        });
-      }
-      
-      // Sort by date (newest first)
-      return applications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Fetch user stats from API
+    const statsData = await apiRequest(`/api/firebase/users/${userId}/stats`);
+    
+    // Fetch applications from API
+    const applications = await apiRequest(`/api/firebase/users/${userId}/applications`);
+    
+    // Transform the applications data
+    const formattedApplications: JobApplication[] = applications.map((app: any) => ({
+      id: app.id.toString(),
+      title: app.title,
+      company: app.company,
+      url: app.url,
+      date: app.date instanceof Date ? app.date.toISOString().split('T')[0] : 
+            typeof app.date === 'string' ? app.date : new Date(app.date).toISOString().split('T')[0],
+      status: app.status,
+      tags: app.tags || [],
+      notes: app.notes
+    }));
+    
+    // Calculate response rate
+    const respondedApps = formattedApplications.filter(
+      app => app.status !== 'applied'
+    ).length;
+    
+    const responseRate = formattedApplications.length ? 
+      (respondedApps / formattedApplications.length) * 100 : 0;
+    
+    // Build ApplicationStats object
+    const stats: ApplicationStats = {
+      totalApplications: statsData.totalApplications || 0,
+      weeklyApplications: statsData.weeklyApplications || 0,
+      monthlyApplications: statsData.monthlyApplications || 0,
+      streak: statsData.streak || 0,
+      maxStreak: statsData.maxStreak || 0,
+      responseRate,
+      lastUpdate: new Date().toISOString(),
+      appliedJobs: formattedApplications.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
     };
-    
-    // Calculate streak and response rate from applications
-    const calculateStats = (applications: JobApplication[]): ApplicationStats => {
-      // Count applications in the last 7 and 30 days
-      const now = new Date();
-      const last7Days = new Date();
-      last7Days.setDate(now.getDate() - 7);
-      
-      const last30Days = new Date();
-      last30Days.setDate(now.getDate() - 30);
-      
-      const weeklyApplications = applications.filter(
-        app => new Date(app.date) >= last7Days
-      ).length;
-      
-      const monthlyApplications = applications.filter(
-        app => new Date(app.date) >= last30Days
-      ).length;
-      
-      // Calculate response rate
-      const respondedApps = applications.filter(
-        app => app.status !== 'applied'
-      ).length;
-      
-      const responseRate = applications.length ? (respondedApps / applications.length) * 100 : 0;
-      
-      // Calculate current streak (simplified)
-      const streak = 1 + Math.floor(Math.random() * 10); // Just for demo
-      
-      return {
-        totalApplications: applications.length,
-        weeklyApplications,
-        monthlyApplications,
-        streak,
-        maxStreak: streak + Math.floor(Math.random() * 5),
-        responseRate,
-        lastUpdate: new Date().toISOString(),
-        appliedJobs: applications
-      };
-    };
-    
-    // Generate demo applications and stats
-    const applications = generateDemoApplications();
-    const stats = calculateStats(applications);
     
     return stats;
   } catch (error) {
     console.error("Error getting user stats:", error);
-    throw error;
+    
+    // Return default stats to prevent UI breakage
+    return {
+      totalApplications: 0,
+      weeklyApplications: 0,
+      monthlyApplications: 0,
+      streak: 0,
+      maxStreak: 0,
+      responseRate: 0,
+      lastUpdate: new Date().toISOString(),
+      appliedJobs: []
+    };
   }
 };
 
-// Add a new friend (for demo purposes)
+// Add a new friend
 export const addFriend = async (userId: string, friendEmail: string): Promise<Friend> => {
   try {
-    // Make sure we have an entry for this user
-    if (!inMemoryFriends[userId]) {
-      initializeDefaultFriends(userId);
+    if (!userId || !friendEmail) {
+      throw new Error("User ID and friend email are required");
     }
-
-    // Create new friend with mock data
-    const newFriend: Friend = {
-      id: `friend-${Date.now()}`,
-      displayName: friendEmail.split('@')[0], // Use part before @ as display name
-      photoURL: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'men' : 'women'}/${Math.floor(Math.random() * 100)}.jpg`,
-      totalApplications: Math.floor(Math.random() * 50) + 5,
-      streak: Math.floor(Math.random() * 8) + 1,
+    
+    // Call API to add friend
+    const newFriend = await apiRequest(`/api/firebase/users/${userId}/friends`, {
+      method: 'POST',
+      body: JSON.stringify({ email: friendEmail })
+    });
+    
+    // Transform API response to Friend type
+    return {
+      id: newFriend.uid,
+      displayName: newFriend.displayName,
+      photoURL: newFriend.photoURL,
+      totalApplications: newFriend.totalApplications || 0,
+      streak: newFriend.streak || 0,
       status: 'online',
-      lastActive: new Date().toISOString()
+      lastActive: newFriend.lastActive || new Date().toISOString(),
+      email: newFriend.email
     };
-    
-    // Add the new friend to the in-memory store
-    inMemoryFriends[userId].push(newFriend);
-    
-    return newFriend;
   } catch (error) {
     console.error("Error adding friend:", error);
     throw error;
   }
 };
 
-// Remove a friend (for demo purposes)
+// Remove a friend
 export const removeFriend = async (userId: string, friendId: string): Promise<void> => {
   try {
-    // Make sure we have an entry for this user
-    if (!inMemoryFriends[userId]) {
-      return Promise.resolve();
+    if (!userId || !friendId) {
+      throw new Error("User ID and friend ID are required");
     }
     
-    // Remove the friend from the in-memory store
-    inMemoryFriends[userId] = inMemoryFriends[userId].filter(friend => friend.id !== friendId);
+    // Call API to remove friend
+    await apiRequest(`/api/firebase/users/${userId}/friends/${friendId}`, {
+      method: 'DELETE'
+    });
     
-    console.log(`Removed friend ${friendId} from user ${userId}`);
     return Promise.resolve();
   } catch (error) {
     console.error("Error removing friend:", error);
@@ -272,5 +234,5 @@ export const formatApplicationTime = (timestamp: string | number | Date): string
   }
 };
 
-// Export the Firebase services
-export { app, auth, db };
+// Re-export the Firebase services from firebaseShared.ts
+export { auth, db, app } from './firebaseShared';

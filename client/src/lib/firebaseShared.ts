@@ -47,9 +47,9 @@ function getFirebaseConfig() {
 }
 
 // Initialize Firebase with appropriate config
-const app = initializeApp(getFirebaseConfig());
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+const firebaseApp = initializeApp(getFirebaseConfig());
+export const auth = getAuth(firebaseApp);
+export const db = getFirestore(firebaseApp);
 
 // Export the app instance for other Firebase services
-export default app;
+export const app = firebaseApp;

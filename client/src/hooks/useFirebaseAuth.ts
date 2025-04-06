@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth, logoutUser, signInWithGoogle } from '@/lib/firebase';
+import { auth } from '@/lib/firebaseShared';
+import { logoutUser, signInWithGoogle } from '@/lib/firebase';
 
 interface UseFirebaseAuthReturn {
   user: User | null;

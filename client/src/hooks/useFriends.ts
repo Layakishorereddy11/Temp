@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Friend, ApplicationStats, ChartData, JobApplication } from '@/types';
 import { getFriends, getUserStats } from '@/lib/firebase';
 import { format, subDays, parseISO } from 'date-fns';
+import { auth } from '@/lib/firebaseShared';
+import useWebSocket from './useWebSocket';
 
 // Helper function to generate chart data from stats for friends
 function generateChartDataFromStats(stats: ApplicationStats): { 
@@ -110,6 +112,7 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
   const [selectedFriendStats, setSelectedFriendStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { lastMessage, sendMessage, connected } = useWebSocket();
 
   // Function to load friends
   const loadFriends = useCallback(async () => {
@@ -144,6 +147,15 @@ export default function useFriends(userId: string | null): UseFriendsReturn {
   useEffect(() => {
     loadFriends();
   }, [loadFriends]);
+  
+  // Listen for WebSocket messages about friend changes
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === 'FRIEND_ADDED') {
+      console.log('Friend added websocket notification received');
+      // Refresh the friends list when a friend is added
+      loadFriends();
+    }
+  }, [lastMessage, loadFriends]);
 
   // Function to select a friend and load their stats
   const selectFriend = useCallback(async (friendId: string) => {
